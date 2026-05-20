@@ -1,0 +1,34 @@
+# Dependency directories
+node_modules/
+**/node_modules/
+
+# Build and compilation outputs
+dist/
+**/dist/
+*.tsbuildinfo
+**/*.tsbuildinfo
+out/
+**/out/
+
+# IDEs and Editors
+.vscode/
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+.DS_Store
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# OS files
+Thumbs.db
+db.json

@@ -1,0 +1,20 @@
+{
+  "name": "@bang-bang/client",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Bang Bang Remake — Phaser 3 Client",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@bang-bang/shared": "*",
+    "phaser": "^3.88.0"
+  },
+  "devDependencies": {
+    "typescript": "~6.0.2",
+    "vite": "^8.0.12"
+  }
+}

@@ -1,0 +1,21 @@
+{
+  "name": "@bang-bang/server",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Bang Bang Remake — Server (WebSocket, authoritative)",
+  "main": "dist/main.js",
+  "scripts": {
+    "build": "tsc --project tsconfig.json",
+    "start": "node dist/main.js",
+    "dev": "tsx src/main.ts"
+  },
+  "dependencies": {
+    "@bang-bang/shared": "*",
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "@types/ws": "^8.5.13",
+    "tsx": "^4.19.0"
+  }
+}
