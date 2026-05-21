@@ -11,6 +11,7 @@ import { HUDController } from '../ui/HUDController';
 import { MatchOverlayController } from '../ui/MatchOverlayController';
 import { MinimapController } from '../ui/MinimapController';
 import { KillFeedController } from '../ui/KillFeedController';
+import { TankSelectionController } from '../ui/TankSelectionController';
 import { ARCTIC_COLLISION } from '../shared/data/arctic-collision';
 import { loadCollisionMap } from '../shared/data/collision-map-loader';
 import { TileType } from '../shared/types/environment';
@@ -38,6 +39,7 @@ export interface SceneRefs {
   matchOverlayController: MatchOverlayController;
   minimapController: MinimapController;
   killFeedController: KillFeedController;
+  tankSelectionController: TankSelectionController;
 }
 
 export class SceneBuilder {
@@ -232,6 +234,13 @@ export class SceneBuilder {
     killFeedNode.setPosition(400, 190, 0);
     const killFeedController = killFeedNode.addComponent(KillFeedController);
 
+    // Tank Selection Overlay
+    const selectOverlayNode = new Node('TankSelectionOverlay');
+    selectOverlayNode.layer = Layers.Enum.UI_2D;
+    selectOverlayNode.addComponent(UITransform);
+    uiCanvasNode.addChild(selectOverlayNode);
+    const tankSelectionController = selectOverlayNode.addComponent(TankSelectionController);
+
     return {
       gameCamera: cam,
       inputManager,
@@ -243,6 +252,7 @@ export class SceneBuilder {
       matchOverlayController,
       minimapController,
       killFeedController,
+      tankSelectionController,
     };
   }
 

@@ -19,6 +19,7 @@ import { HUDController } from '../ui/HUDController';
 import { MatchOverlayController } from '../ui/MatchOverlayController';
 import { MinimapController } from '../ui/MinimapController';
 import { KillFeedController } from '../ui/KillFeedController';
+import { TankSelectionController } from '../ui/TankSelectionController';
 import type { GameSnapshot, PlayerInput, GameEvent } from '../shared/types/network';
 import { GameEventType } from '../shared/types/network';
 import type { Radians } from '../shared/types/core';
@@ -62,6 +63,7 @@ export class GameManager extends Component {
   private lastKnownPlayerHp = 0;
 
   private sceneBuilder: SceneBuilder = new SceneBuilder();
+  private selectionController: TankSelectionController | null = null;
 
   private selectedTankId: TankId = TankId.IronMan; // dynamic lobby select in Task 7.1
   private skillECooldownMs = 0;
@@ -84,19 +86,37 @@ export class GameManager extends Component {
     this.matchOverlay = refs.matchOverlayController;
     this.minimapController = refs.minimapController;
     this.killFeedController = refs.killFeedController;
+    this.selectionController = refs.tankSelectionController;
 
-    const tankDef = TANK_ROSTER[this.selectedTankId];
-    if (tankDef) {
-      this.skillEMaxCooldownMs = tankDef.skillE.cooldownSec * 1000;
-      this.skillSpaceMaxCooldownMs = tankDef.skillSpace.cooldownSec * 1000;
-    }
+    if (this.selectionController) {
+      this.selectionController.init(async (selectedId) => {
+        console.log(`[Game] Tank selected: ${selectedId}`);
+        this.selectedTankId = selectedId;
 
-    const serverAvailable = await NetworkClient.isServerAvailable(SERVER_INFO_URL);
-    if (serverAvailable) {
-      this.startOnlineMode();
+        const tankDef = TANK_ROSTER[this.selectedTankId];
+        if (tankDef) {
+          this.skillEMaxCooldownMs = tankDef.skillE.cooldownSec * 1000;
+          this.skillSpaceMaxCooldownMs = tankDef.skillSpace.cooldownSec * 1000;
+        }
+
+        this.selectionController!.node.active = false;
+
+        const serverAvailable = await NetworkClient.isServerAvailable(SERVER_INFO_URL);
+        if (serverAvailable) {
+          this.startOnlineMode();
+        } else {
+          console.log('[Game] Server not available → local mode');
+          this.startLocalMode();
+        }
+      });
     } else {
-      console.log('[Game] Server not available → local mode');
-      this.startLocalMode();
+      const serverAvailable = await NetworkClient.isServerAvailable(SERVER_INFO_URL);
+      if (serverAvailable) {
+        this.startOnlineMode();
+      } else {
+        console.log('[Game] Server not available → local mode');
+        this.startLocalMode();
+      }
     }
   }
 
