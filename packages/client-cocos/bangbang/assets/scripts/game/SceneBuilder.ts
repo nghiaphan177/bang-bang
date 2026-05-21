@@ -118,6 +118,8 @@ export class SceneBuilder {
     // ── UI Canvas ──────────────────────────────────────────────
     const uiCanvasNode = new Node('UICanvas');
     uiCanvasNode.layer = Layers.Enum.UI_2D;
+    const canvasTrans = uiCanvasNode.addComponent(UITransform);
+    canvasTrans.setContentSize(1280, 720);
     root.addChild(uiCanvasNode);
     const canvas = uiCanvasNode.addComponent(Canvas);
 

@@ -36,6 +36,13 @@ export class TankSelectionController extends Component {
     this.node.addChild(bgBlockerNode);
     this.bgGraphics = bgBlockerNode.addComponent(Graphics);
 
+    bgBlockerNode.on(Node.EventType.TOUCH_START, (event: any) => {
+      event.propagationStopped = true;
+    });
+    bgBlockerNode.on(Node.EventType.MOUSE_DOWN, (event: any) => {
+      event.propagationStopped = true;
+    });
+
     // 1. Title Label
     const titleNode = new Node('TitleLabel');
     titleNode.layer = Layers.Enum.UI_2D;
@@ -149,8 +156,13 @@ export class TankSelectionController extends Component {
       passiveLabel.overflow = 3; // RESIZE_HEIGHT
 
       // Event listener for click/tap
-      cardNode.on(Node.EventType.TOUCH_START, () => {
+      cardNode.on(Node.EventType.TOUCH_START, (event: any) => {
         this.selectTank(id);
+        event.propagationStopped = true;
+      });
+      cardNode.on(Node.EventType.MOUSE_DOWN, (event: any) => {
+        this.selectTank(id);
+        event.propagationStopped = true;
       });
 
       this.cards.set(id, { bgGraphics, node: cardNode });
@@ -184,10 +196,17 @@ export class TankSelectionController extends Component {
     btnOutline.color = new Color(0, 0, 0, 255);
     btnOutline.width = 2;
 
-    battleBtnNode.on(Node.EventType.TOUCH_START, () => {
+    battleBtnNode.on(Node.EventType.TOUCH_START, (event: any) => {
       if (this.confirmCallback) {
         this.confirmCallback(this.selectedId);
       }
+      event.propagationStopped = true;
+    });
+    battleBtnNode.on(Node.EventType.MOUSE_DOWN, (event: any) => {
+      if (this.confirmCallback) {
+        this.confirmCallback(this.selectedId);
+      }
+      event.propagationStopped = true;
     });
 
     this.redraw();
