@@ -56,7 +56,8 @@ export class HUDController extends Component {
     if (this.matchTimerLabel) {
       const mins = Math.floor(timerSec / 60);
       const secs = Math.floor(timerSec % 60);
-      this.matchTimerLabel.string = `${mins}:${secs.toString().padStart(2, '0')}`;
+      const secStr = secs < 10 ? `0${secs}` : `${secs}`;
+      this.matchTimerLabel.string = `${mins}:${secStr}`;
     }
     if (this.scoreLabel) {
       this.scoreLabel.string = `${redScore} - ${blueScore}`;

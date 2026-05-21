@@ -97,7 +97,7 @@ All remote tanks rendered as red. `TeamId` from snapshot is ignored.
 ---
 
 #### Task 1.2 — Wire HUD, MatchOverlay, and Minimap into GameManager
-- **Status:** `[ ]`
+- **Status:** `[x]`
 - **Deps:** Task 1.1
 - **Priority:** 🟠 P1
 - **Effort:** Medium (2-3 hours)

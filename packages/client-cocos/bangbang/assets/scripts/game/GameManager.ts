@@ -15,6 +15,9 @@ import { EntityInterpolation, type InterpolatedEntity } from '../network/EntityI
 import { TankController, type RenderableTank } from '../rendering/TankController';
 import { MapController } from '../rendering/MapController';
 import { ProjectileController, type RenderableProjectile } from '../rendering/ProjectileController';
+import { HUDController } from '../ui/HUDController';
+import { MatchOverlayController } from '../ui/MatchOverlayController';
+import { MinimapController } from '../ui/MinimapController';
 import type { GameSnapshot, PlayerInput } from '../shared/types/network';
 import type { Radians } from '../shared/types/core';
 import { SceneBuilder, TILE_PX } from './SceneBuilder';
@@ -32,6 +35,9 @@ export class GameManager extends Component {
   private mapController: MapController | null = null;
   private projectileController: ProjectileController | null = null;
   private playerTankController: TankController | null = null;
+  private hudController: HUDController | null = null;
+  private matchOverlay: MatchOverlayController | null = null;
+  private minimapController: MinimapController | null = null;
 
   private mode: 'connecting' | 'online' | 'local' = 'connecting';
   private networkClient: NetworkClient | null = null;
@@ -57,6 +63,9 @@ export class GameManager extends Component {
     this.mapController = refs.mapController;
     this.projectileController = refs.projectileController;
     this.playerTankController = refs.playerTankController;
+    this.hudController = refs.hudController;
+    this.matchOverlay = refs.matchOverlayController;
+    this.minimapController = refs.minimapController;
 
     const serverAvailable = await NetworkClient.isServerAvailable(SERVER_INFO_URL);
     if (serverAvailable) {
@@ -149,11 +158,31 @@ export class GameManager extends Component {
         }
       }
       this.playerTankController.updateFromState(rd);
+
+      // HUD
+      if (this.hudController) {
+        this.hudController.updateHP(rd.health.hp, rd.health.maxHp);
+        this.hudController.updateNetworkStatus(
+          this.networkClient?.getRTT() ?? 0,
+          this.mode,
+          this.latestSnapshot?.tanks.length ?? 0
+        );
+      }
     }
 
     // ── Render Remotes ─────────────────────────────────────────
+    let remotes: InterpolatedEntity[] = [];
     if (this.interpolation) {
-      this.renderRemotes(this.interpolation.getInterpolatedEntities(Date.now()));
+      remotes = this.interpolation.getInterpolatedEntities(Date.now());
+      this.renderRemotes(remotes);
+    }
+
+    // ── Minimap ────────────────────────────────────────────────
+    if (this.minimapController) {
+      this.minimapController.updateEntities(
+        this.prediction.position,
+        remotes.map(e => ({ x: e.position.x, y: e.position.y, isAlly: false }))
+      );
     }
 
     // ── Camera Follow ──────────────────────────────────────────
@@ -171,6 +200,13 @@ export class GameManager extends Component {
       for (const d of snapshot.mapDelta) {
         this.mapController.markDestroyed(d.col, d.row);
       }
+    }
+
+    const ms = snapshot.matchState;
+    if (ms) {
+      if (ms.phase === 'Countdown') this.matchOverlay?.showCountdown(ms.countdownSec);
+      if (ms.phase === 'Playing') this.hudController?.updateMatchInfo(ms.matchTimeSec, ms.teamScores['Red'] ?? 0, ms.teamScores['Blue'] ?? 0);
+      if (ms.phase === 'MatchEnd') this.matchOverlay?.showResults(ms.winnerId, ms.scores as any);
     }
 
     this.renderProjectiles(snapshot);

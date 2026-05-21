@@ -1,11 +1,14 @@
 import {
   Node, Camera, MeshRenderer, primitives, utils, Color, Material,
-  DirectionalLight, Texture2D, resources,
+  DirectionalLight, Texture2D, resources, Canvas, Label, ProgressBar, Graphics,
 } from 'cc';
 import { InputManager } from '../input/InputManager';
 import { MapController } from '../rendering/MapController';
 import { ProjectileController } from '../rendering/ProjectileController';
 import { TankController } from '../rendering/TankController';
+import { HUDController } from '../ui/HUDController';
+import { MatchOverlayController } from '../ui/MatchOverlayController';
+import { MinimapController } from '../ui/MinimapController';
 import { ARCTIC_COLLISION } from '../shared/data/arctic-collision';
 import { loadCollisionMap } from '../shared/data/collision-map-loader';
 import { TileType } from '../shared/types/environment';
@@ -29,6 +32,9 @@ export interface SceneRefs {
   projectileController: ProjectileController;
   playerTankController: TankController;
   remoteTanksContainer: Node;
+  hudController: HUDController;
+  matchOverlayController: MatchOverlayController;
+  minimapController: MinimapController;
 }
 
 export class SceneBuilder {
@@ -104,6 +110,56 @@ export class SceneBuilder {
     const inputManager = inputNode.addComponent(InputManager);
     inputManager.gameCamera = cam;
 
+    // ── UI Canvas ──────────────────────────────────────────────
+    const uiCanvasNode = new Node('UICanvas');
+    root.addChild(uiCanvasNode);
+    const canvas = uiCanvasNode.addComponent(Canvas);
+
+    // HUD
+    const hudNode = new Node('HUD');
+    uiCanvasNode.addChild(hudNode);
+    const hudController = hudNode.addComponent(HUDController);
+    
+    const hpBarNode = new Node('HPBar');
+    hudNode.addChild(hpBarNode);
+    hudController.hpBar = hpBarNode.addComponent(ProgressBar);
+    
+    const hpLabelNode = new Node('HPLabel');
+    hudNode.addChild(hpLabelNode);
+    hudController.hpLabel = hpLabelNode.addComponent(Label);
+    
+    hudController.pingLabel = this.createLabelNode('PingLabel', hudNode);
+    hudController.modeLabel = this.createLabelNode('ModeLabel', hudNode);
+    hudController.playerCountLabel = this.createLabelNode('PlayerCountLabel', hudNode);
+    hudController.matchTimerLabel = this.createLabelNode('MatchTimerLabel', hudNode);
+    hudController.scoreLabel = this.createLabelNode('ScoreLabel', hudNode);
+
+    // MatchOverlay
+    const matchOverlayNode = new Node('MatchOverlay');
+    uiCanvasNode.addChild(matchOverlayNode);
+    const matchOverlayController = matchOverlayNode.addComponent(MatchOverlayController);
+    
+    matchOverlayController.countdownLabel = this.createLabelNode('CountdownLabel', matchOverlayNode);
+    matchOverlayController.countdownLabel.fontSize = 72;
+    matchOverlayController.countdownLabel.isBold = true;
+    
+    const resultsPanel = new Node('ResultsPanel');
+    matchOverlayNode.addChild(resultsPanel);
+    resultsPanel.active = false;
+    matchOverlayController.resultsPanel = resultsPanel;
+    
+    matchOverlayController.resultsTitleLabel = this.createLabelNode('ResultsTitleLabel', resultsPanel);
+    matchOverlayController.resultsDetailsLabel = this.createLabelNode('ResultsDetailsLabel', resultsPanel);
+
+    // Minimap
+    const minimapNode = new Node('MinimapContainer');
+    uiCanvasNode.addChild(minimapNode);
+    const minimapController = minimapNode.addComponent(MinimapController);
+    
+    const minimapGraphicsNode = new Node('MinimapGraphics');
+    minimapNode.addChild(minimapGraphicsNode);
+    minimapController.graphics = minimapGraphicsNode.addComponent(Graphics);
+
     return {
       gameCamera: cam,
       inputManager,
@@ -111,7 +167,16 @@ export class SceneBuilder {
       projectileController,
       playerTankController,
       remoteTanksContainer,
+      hudController,
+      matchOverlayController,
+      minimapController,
     };
+  }
+
+  private createLabelNode(name: string, parent: Node): Label {
+    const node = new Node(name);
+    parent.addChild(node);
+    return node.addComponent(Label);
   }
 
   public createRemoteTankNode(name: string): Node {
