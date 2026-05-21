@@ -182,6 +182,15 @@ export interface CombatStatsComponent {
   speed: number;
 }
 
+// ─── Evolution ──────────────────────────────────────────────────────
+
+export interface EvolutionComponent {
+  level: number;        // 1-5
+  currentExp: number;
+  expToNextLevel: number;
+}
+
+
 // ─── Input Buffer ───────────────────────────────────────────────────
 
 export interface InputComponent {
@@ -226,4 +235,6 @@ export interface GameEntity {
   collider?: ColliderComponent;
   dashState?: DashStateComponent;
   castState?: CastStateComponent;
+  evolution?: EvolutionComponent;
+  recentDamage?: Array<{ attackerId: EntityId; timestamp: number }>;
 }

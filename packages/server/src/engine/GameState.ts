@@ -73,6 +73,7 @@ export class GameState {
         activeEffects: effects,
         isAlive: entity.health.isAlive,
         team: entity.tankIdentity.team,
+        level: entity.evolution?.level ?? 1,
       });
     }
 

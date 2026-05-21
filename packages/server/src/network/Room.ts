@@ -26,6 +26,9 @@ import {
   type SnapshotMessage,
   type GameSnapshot,
   type MatchEndMessage,
+  type GameEvent,
+  type GameEventMessage,
+  GameEventType,
   TeamId,
   TankId,
   loadCollisionMap,
@@ -41,6 +44,7 @@ import { CombatSystem } from '../engine/systems/CombatSystem';
 import { StatusEffectSystem } from '../engine/systems/StatusEffectSystem';
 import { DashSystem } from '../engine/systems/DashSystem';
 import { HitscanSystem } from '../engine/systems/HitscanSystem';
+import { EvolutionSystem } from '../engine/systems/EvolutionSystem';
 import { TANK_ROSTER } from '../data/tank-roster';
 import { InputBuffer } from './InputBuffer';
 
@@ -61,6 +65,7 @@ const MATCH_END_DISPLAY_SEC = 8;         // Results screen duration
 export interface RoomPlayer {
   playerId: PlayerId;
   tankId: TankId;
+  playerName: string;
   entityId: EntityId;
   team: TeamId;
   ws: WebSocket;
@@ -88,6 +93,7 @@ export class Room {
   private readonly statusEffectSystem = new StatusEffectSystem();
   private readonly dashSystem = new DashSystem();
   private readonly hitscanSystem = new HitscanSystem();
+  private readonly evolutionSystem = new EvolutionSystem();
 
   private tickInterval: ReturnType<typeof setInterval> | null = null;
   private lastTickTime: number = 0;
@@ -121,7 +127,7 @@ export class Room {
   get playerCount(): number { return this.players.size; }
   get isFull(): boolean { return this.players.size >= MAX_PLAYERS; }
 
-  addPlayer(playerId: PlayerId, tankId: TankId, ws: WebSocket): EntityId | null {
+  addPlayer(playerId: PlayerId, tankId: TankId, ws: WebSocket, playerName: string): EntityId | null {
     if (this.isFull) return null;
     if (this.players.has(playerId)) return null;
 
@@ -177,10 +183,12 @@ export class Room {
     };
     entity.collider = { radius: def.hitboxRadius / 32, isStatic: false };
     entity.statusEffects = { effects: [] };
+    entity.evolution = { level: 1, currentExp: 0, expToNextLevel: 100 };
 
     const player: RoomPlayer = {
       playerId,
       tankId,
+      playerName,
       entityId: entity.id,
       team,
       ws,
@@ -338,6 +346,7 @@ export class Room {
     this.collisionSystem.update(em, this.gameState, dt);
     this.projectileSystem.update(em, this.gameState, dt);
     this.combatSystem.update(em, this.gameState, dt);
+    this.evolutionSystem.update(em, dt);
 
     // Tick down player stealth window
     for (const tank of em.getTanks()) {
@@ -432,14 +441,67 @@ export class Room {
 
         // Attribute kill — find who killed them via last projectile hit
         const killerEntityId = this.findKillerEntityId(tank.id);
-        if (killerEntityId) {
-          const killerPlayer = this.findPlayerByEntityId(killerEntityId);
-          if (killerPlayer) {
-            killerPlayer.kills++;
-            this.teamKills[killerPlayer.team as string] =
-              (this.teamKills[killerPlayer.team as string] ?? 0) + 1;
-            console.log(`[Room ${this.id}] KILL: ${killerPlayer.playerId} → ${victimPlayer.playerId} (${killerPlayer.kills} kills)`);
+        const killerPlayer = killerEntityId ? this.findPlayerByEntityId(killerEntityId) : undefined;
+
+        if (killerPlayer) {
+          killerPlayer.kills++;
+          this.teamKills[killerPlayer.team as string] =
+            (this.teamKills[killerPlayer.team as string] ?? 0) + 1;
+          console.log(`[Room ${this.id}] KILL: ${killerPlayer.playerId} → ${victimPlayer.playerId} (${killerPlayer.kills} kills)`);
+        }
+
+        // Process assists and award EXP
+        const assistants = new Set<EntityId>();
+        const fiveSecondsAgo = Date.now() - 5000;
+        if (tank.recentDamage) {
+          for (const dmg of tank.recentDamage) {
+            if (dmg.timestamp >= fiveSecondsAgo && dmg.attackerId !== killerEntityId && dmg.attackerId !== tank.id) {
+              const attackerEntity = em.get(dmg.attackerId);
+              if (attackerEntity && attackerEntity.tankIdentity?.team !== tank.tankIdentity.team) {
+                assistants.add(dmg.attackerId);
+              }
+            }
           }
+        }
+
+        // Award EXP to killer entity
+        if (killerEntityId) {
+          const killerEntity = em.get(killerEntityId);
+          if (killerEntity?.evolution) {
+            killerEntity.evolution.currentExp += 50;
+          }
+        }
+
+        // Award EXP to assistant entities
+        for (const assistantId of assistants) {
+          const assistantEntity = em.get(assistantId);
+          if (assistantEntity?.evolution) {
+            assistantEntity.evolution.currentExp += 25;
+          }
+        }
+
+        // Clear victim recent damage history
+        tank.recentDamage = [];
+
+        // Broadcast kill event
+        const gameEvent: GameEvent = {
+          eventType: GameEventType.Kill,
+          timestamp: Date.now() as Milliseconds,
+          data: {
+            killerId: killerPlayer ? killerPlayer.playerId : 'Unknown',
+            killerName: killerPlayer ? killerPlayer.playerName : 'Unknown',
+            victimId: victimPlayer.playerId,
+            victimName: victimPlayer.playerName,
+          },
+        };
+
+        const msg: GameEventMessage = {
+          type: ServerMessageType.GameEvent,
+          event: gameEvent,
+        };
+
+        for (const p of this.players.values()) {
+          this.sendToPlayer(p, msg);
         }
 
         // Queue respawn

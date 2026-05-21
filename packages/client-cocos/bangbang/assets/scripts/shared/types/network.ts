@@ -85,6 +85,7 @@ export interface TankSnapshot {
   readonly activeEffects: readonly StatusEffect[];
   readonly isAlive: boolean;
   readonly team: TeamId;
+  readonly level: number;
 }
 
 /** Full authoritative game state for a tick */
