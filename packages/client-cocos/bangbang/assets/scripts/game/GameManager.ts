@@ -6,7 +6,7 @@
  */
 
 import {
-  _decorator, Component, Node, Camera, Vec3, Quat, Color,
+  _decorator, Component, Node, Camera, Vec3, Quat, Color, tween,
 } from 'cc';
 import { InputManager } from '../input/InputManager';
 import { NetworkClient, type NetworkClientOptions } from '../network/NetworkClient';
@@ -55,6 +55,11 @@ export class GameManager extends Component {
   private remoteTankControllers: Map<string, TankController> = new Map();
   private remoteTankNodes: Map<string, Node> = new Map();
   private latestSnapshot: GameSnapshot | null = null;
+  private knownProjectileIds: Set<string> = new Set();
+  
+  private cameraShakeX = 0;
+  private cameraShakeZ = 0;
+  private lastKnownPlayerHp = 0;
 
   private sceneBuilder: SceneBuilder = new SceneBuilder();
 
@@ -261,6 +266,39 @@ export class GameManager extends Component {
       }
     }
 
+    // ── Muzzle Flash & Screen Shake ───────────────────────────
+    const currentProjIds = new Set<string>();
+    for (const p of snapshot.projectiles) {
+      currentProjIds.add(p.id);
+      if (!this.knownProjectileIds.has(p.id)) {
+        this.knownProjectileIds.add(p.id);
+        
+        // Trigger muzzle flash on the owner
+        if (p.ownerId === this.playerId) {
+          this.playerTankController?.fireEffect();
+        } else {
+          const ctrl = this.remoteTankControllers.get(p.ownerId);
+          ctrl?.fireEffect();
+        }
+      }
+    }
+    // Clean up expired projectile IDs
+    for (const id of this.knownProjectileIds) {
+      if (!currentProjIds.has(id)) {
+        this.knownProjectileIds.delete(id);
+      }
+    }
+
+    // Screen Shake on Damage
+    const me = snapshot.tanks.find(t => (t.playerId as string) === this.playerId);
+    if (me) {
+      if (this.lastKnownPlayerHp > 0 && me.hp < this.lastKnownPlayerHp && me.isAlive) {
+        const hpLost = this.lastKnownPlayerHp - me.hp;
+        this.triggerScreenShake(hpLost, me.maxHp);
+      }
+      this.lastKnownPlayerHp = me.hp;
+    }
+
     const ms = snapshot.matchState;
     if (ms) {
       if (ms.phase === MatchPhase.WaitingForPlayers) {
@@ -287,6 +325,21 @@ export class GameManager extends Component {
     }
 
     this.renderProjectiles(snapshot);
+  }
+
+  private triggerScreenShake(hpLost: number, maxHp: number): void {
+    const intensity = Math.min(15, (hpLost / maxHp) * 45);
+    
+    tween(this as any).stop();
+    this.cameraShakeX = intensity;
+    this.cameraShakeZ = intensity * 0.6;
+
+    tween(this as any)
+      .to(0.04, { cameraShakeX: -intensity * 1.5, cameraShakeZ: -intensity * 0.9 })
+      .to(0.04, { cameraShakeX: intensity * 1.0, cameraShakeZ: intensity * 0.6 })
+      .to(0.04, { cameraShakeX: -intensity * 0.5, cameraShakeZ: -intensity * 0.3 })
+      .to(0.04, { cameraShakeX: 0, cameraShakeZ: 0 })
+      .start();
   }
 
   private onGameEvent(event: GameEvent): void {
@@ -342,10 +395,14 @@ export class GameManager extends Component {
     const tx = this.prediction.position.x * TILE_PX;
     const tz = this.prediction.position.y * TILE_PX;
     const p = cn.getPosition();
+    
+    const targetX = tx + this.cameraShakeX;
+    const targetZ = tz + this.cameraShakeZ;
+
     cn.setPosition(
-      p.x + (tx - p.x) * 0.1,
+      p.x + (targetX - p.x) * 0.1,
       p.y,
-      p.z + (tz - p.z) * 0.1,
+      p.z + (targetZ - p.z) * 0.1,
     );
   }
 
