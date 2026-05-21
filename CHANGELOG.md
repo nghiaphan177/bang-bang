@@ -10,3 +10,4 @@
 - **Build**: Implemented root CI scripts (Task 8.1) to typecheck both `shared` and `server` packages with `npm run check:all`.
 - **Build**: Fixed TypeScript compilation issues in the Cocos Creator client copy of the shared package by re-exporting core type declarations from `network.ts`.
 - **Client**: Handled match phases in `GameManager` (Task 3.1). Added support for displaying "Waiting for players..." state, hiding match info when not playing, and disabling player input during the `MatchEnd` phase.
+- **Client**: Implemented team-aware tank mesh coloring (Task 3.2). Swaps hull and turret dome materials reactively based on team affiliation relative to the local player (Green for player, Blue for ally, Red for enemy).

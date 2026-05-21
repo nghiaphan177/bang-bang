@@ -17,6 +17,13 @@ const { ccclass, property } = _decorator;
 const TILE_PX = 32;
 const _tempQuat = new Quat();
 
+const COL_PLAYER_H = new Color(60, 140, 70, 255);
+const COL_PLAYER_T = new Color(45, 110, 55, 255);
+const COL_ENEMY_H  = new Color(180, 50, 50, 255);
+const COL_ENEMY_T  = new Color(140, 40, 40, 255);
+const COL_ALLY_H   = new Color(52, 152, 219, 255);
+const COL_ALLY_T   = new Color(41, 128, 185, 255);
+
 export interface RenderableTank {
   transform: { position: { x: number; y: number }; rotation: number };
   turret: { aimAngle: number };
@@ -41,6 +48,7 @@ export class TankController extends Component {
   private hpBarFill: Node | null = null;
   private hpBarDividers: Node[] = [];
   private currentMaxHp = 0;
+  private currentColorState: 'player' | 'ally' | 'enemy' | null = null;
 
   updateFromState(data: RenderableTank): void {
     const worldX = data.transform.position.x * TILE_PX;
@@ -56,6 +64,19 @@ export class TankController extends Component {
     const hp = data.health.hp;
 
     this.initHPBar(isPlayer, isAlly, maxHp);
+
+    // ── Team Coloring ──────────────────────────────────────────
+    const targetColorState = isPlayer ? 'player' : (isAlly ? 'ally' : 'enemy');
+    if (this.currentColorState !== targetColorState) {
+      this.currentColorState = targetColorState;
+      if (targetColorState === 'player') {
+        this.setTeamColor(COL_PLAYER_H, COL_PLAYER_T);
+      } else if (targetColorState === 'ally') {
+        this.setTeamColor(COL_ALLY_H, COL_ALLY_T);
+      } else {
+        this.setTeamColor(COL_ENEMY_H, COL_ENEMY_T);
+      }
+    }
 
     const ratio = maxHp > 0 ? hp / maxHp : 0;
     if (this.hpBarFill) {
@@ -167,6 +188,30 @@ export class TankController extends Component {
       divider.setScale(0.4, 1.2, 2.8);
       divider.setPosition(x, 0.4, 0);
       this.hpBarDividers.push(divider);
+    }
+  }
+
+  setTeamColor(hullColor: Color, turretColor: Color): void {
+    const hullMat = this.makeMat(hullColor);
+    const turretMat = this.makeMat(turretColor);
+
+    if (this.hullNode) {
+      const hullMR = this.hullNode.getComponent(MeshRenderer);
+      if (hullMR) hullMR.material = hullMat;
+
+      const slopeNode = this.hullNode.getChildByName('HullSlope');
+      if (slopeNode) {
+        const slopeMR = slopeNode.getComponent(MeshRenderer);
+        if (slopeMR) slopeMR.material = hullMat;
+      }
+    }
+
+    if (this.turretPivot) {
+      const domeNode = this.turretPivot.getChildByName('TurretDome');
+      if (domeNode) {
+        const domeMR = domeNode.getComponent(MeshRenderer);
+        if (domeMR) domeMR.material = turretMat;
+      }
     }
   }
 

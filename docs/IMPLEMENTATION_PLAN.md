@@ -449,7 +449,7 @@ SpiderMan's Web Prison (Space) uses `ProjectileArchetype.Lob`.
 ---
 
 #### Task 3.2 — Team-Aware Tank Coloring
-- **Status:** `[ ]`
+- **Status:** `[x]`
 - **Deps:** Task 1.2
 - **Priority:** 🟡 P2
 - **Effort:** Small (1 hour)
