@@ -147,6 +147,8 @@ export class GameManager extends Component {
         },
         turret: { aimAngle: inp.aimAngle },
         health: { hp: 100, maxHp: 100, isAlive: true },
+        isPlayer: true,
+        isAlly: true,
       };
 
       if (this.latestSnapshot) {
@@ -226,6 +228,9 @@ export class GameManager extends Component {
 
   private renderRemotes(entities: InterpolatedEntity[]): void {
     const active = new Set<string>();
+    const myTeam = this.latestSnapshot?.tanks.find(
+      (t) => (t.playerId as string) === this.playerId,
+    )?.team;
 
     for (const e of entities) {
       active.add(e.entityId);
@@ -239,10 +244,14 @@ export class GameManager extends Component {
         this.remoteTankNodes.set(e.entityId, nd);
       }
 
+      const isAlly = myTeam ? e.team === myTeam : false;
+
       ctrl.updateFromState({
         transform: { position: e.position, rotation: e.hullRotation },
         turret: { aimAngle: e.turretRotation },
         health: { hp: e.hp, maxHp: e.maxHp, isAlive: e.isAlive },
+        isPlayer: false,
+        isAlly,
       });
     }
 

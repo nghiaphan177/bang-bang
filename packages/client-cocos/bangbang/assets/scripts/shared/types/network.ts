@@ -6,6 +6,7 @@
 
 import type { EntityId, PlayerId, Vector2, Radians, Milliseconds } from './core';
 import type { TankId } from './tank';
+export type { EntityId, PlayerId, Vector2, Radians, Milliseconds, TankId };
 import type { StatusEffect, ProjectileState } from './combat';
 import type { GameModeConfig, TeamId } from './game-modes';
 import type { TileDefinition } from './environment';
