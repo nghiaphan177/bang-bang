@@ -8,7 +8,10 @@
   ],
   "scripts": {
     "build:shared": "tsc --project packages/shared/tsconfig.json",
-    "check:types": "tsc --project packages/shared/tsconfig.json --noEmit"
+    "check:types": "tsc --project packages/shared/tsconfig.json --noEmit",
+    "check:shared": "tsc --project packages/shared/tsconfig.json --noEmit",
+    "check:server": "tsc --project packages/server/tsconfig.json --noEmit",
+    "check:all": "npm run build:shared && npm run check:server"
   },
   "devDependencies": {
     "typescript": "^5.8.0"

@@ -734,7 +734,7 @@ SpiderMan's Web Prison (Space) uses `ProjectileArchetype.Lob`.
 ### Work Stream 8: Build & Testing
 
 #### Task 8.1 — Type-Check CI Scripts
-- **Status:** `[ ]`
+- **Status:** `[x]`
 - **Deps:** None
 - **Priority:** 🔴 P0
 - **Effort:** Small (15 min)

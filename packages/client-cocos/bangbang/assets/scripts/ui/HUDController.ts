@@ -2,14 +2,14 @@
  * HUDController.ts — In-game HUD overlay
  */
 
-import { _decorator, Component, ProgressBar, Label, Color } from 'cc';
+import { _decorator, Component, Graphics, Label, Color } from 'cc';
 
 const { ccclass, property } = _decorator;
 
 @ccclass('HUDController')
 export class HUDController extends Component {
-  @property(ProgressBar)
-  hpBar: ProgressBar | null = null;
+  @property(Graphics)
+  hpBar: Graphics | null = null;
 
   @property(Label)
   hpLabel: Label | null = null;
@@ -33,7 +33,24 @@ export class HUDController extends Component {
     const ratio = maxHp > 0 ? hp / maxHp : 0;
 
     if (this.hpBar) {
-      this.hpBar.progress = ratio;
+      this.hpBar.clear();
+      // Draw background
+      this.hpBar.fillColor = new Color(40, 40, 45, 200);
+      this.hpBar.rect(-100, -10, 200, 20);
+      this.hpBar.fill();
+
+      // Draw fill
+      if (ratio > 0) {
+        this.hpBar.fillColor = new Color(46, 204, 113, 255); // Green HP bar
+        this.hpBar.rect(-100, -10, 200 * ratio, 20);
+        this.hpBar.fill();
+      }
+
+      // Draw border
+      this.hpBar.strokeColor = new Color(120, 120, 120, 255);
+      this.hpBar.lineWidth = 2;
+      this.hpBar.rect(-100, -10, 200, 20);
+      this.hpBar.stroke();
     }
     if (this.hpLabel) {
       this.hpLabel.string = `${Math.ceil(hp)} / ${maxHp}`;

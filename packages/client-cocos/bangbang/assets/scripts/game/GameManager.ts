@@ -204,9 +204,21 @@ export class GameManager extends Component {
 
     const ms = snapshot.matchState;
     if (ms) {
-      if (ms.phase === 'Countdown') this.matchOverlay?.showCountdown(ms.countdownSec);
-      if (ms.phase === 'Playing') this.hudController?.updateMatchInfo(ms.matchTimeSec, ms.teamScores['Red'] ?? 0, ms.teamScores['Blue'] ?? 0);
-      if (ms.phase === 'MatchEnd') this.matchOverlay?.showResults(ms.winnerId, ms.scores as any);
+      if (ms.phase === 'Countdown') {
+        this.matchOverlay?.showCountdown(ms.countdownSec);
+      } else {
+        this.matchOverlay?.hideCountdown();
+      }
+
+      if (ms.phase === 'Playing') {
+        this.hudController?.updateMatchInfo(ms.matchTimeSec, ms.teamScores['Red'] ?? 0, ms.teamScores['Blue'] ?? 0);
+      }
+
+      if (ms.phase === 'MatchEnd') {
+        this.matchOverlay?.showResults(ms.winnerId, ms.scores as any);
+      } else {
+        this.matchOverlay?.hideResults();
+      }
     }
 
     this.renderProjectiles(snapshot);

@@ -138,7 +138,7 @@ export class SceneBuilder {
     hpBarNode.layer = Layers.Enum.UI_2D;
     hudNode.addChild(hpBarNode);
     hpBarNode.setPosition(-400, 300, 0);
-    hudController.hpBar = hpBarNode.addComponent(ProgressBar);
+    hudController.hpBar = hpBarNode.addComponent(Graphics);
     
     const hpLabelNode = new Node('HPLabel');
     hpLabelNode.layer = Layers.Enum.UI_2D;
@@ -162,6 +162,7 @@ export class SceneBuilder {
     matchOverlayController.countdownLabel = this.createLabelNode('CountdownLabel', matchOverlayNode, 0, 0);
     matchOverlayController.countdownLabel.fontSize = 72;
     matchOverlayController.countdownLabel.isBold = true;
+    matchOverlayController.countdownLabel.node.active = false;
     
     const resultsPanel = new Node('ResultsPanel');
     resultsPanel.layer = Layers.Enum.UI_2D;
