@@ -1,6 +1,6 @@
 # 🤖 AGENT CONTEXT — Bang Bang CMM Remake
 
-> **READ THIS FIRST.** This file is the single source of truth for any AI agent picking up this project. It describes the project architecture, current state, what has been built, what's pending, and all rules you must follow. Updated: 2026-05-20.
+> **READ THIS FIRST.** This file is the single source of truth for any AI agent picking up this project. It describes the project architecture, current state, what has been built, what's pending, and all rules you must follow. Updated: 2026-05-21.
 
 ---
 
@@ -13,10 +13,11 @@
 **Tech Stack:**
 | Layer | Tech | Notes |
 |-------|------|-------|
-| Client/Rendering | Phaser 3 (WebGL) | Bundled with Vite |
+| Client/Rendering | **Cocos Creator 3.8 LTS (3D mode)** | Orthographic top-down camera, cel-shaded 3D tanks |
 | Server | Node.js + `ws` | Authoritative game loop at 60Hz |
 | Shared Types | `@bang-bang/shared` | TypeScript strict, brand types |
 | Networking | WebSockets | Client prediction + server reconciliation |
+| 3D Modeling | Blender 4.x | Low-poly cel-shaded models → `.glb` export |
 | Language | TypeScript strict | `exactOptionalPropertyTypes: true`, `noUncheckedIndexedAccess: true` |
 
 **Design Philosophy:**
@@ -25,6 +26,7 @@
 - Server-authoritative ECS. Client does prediction + interpolation.
 - Circle hitbox for tanks, AABB for tiles.
 - Free movement (NOT grid-locked).
+- **3D rendering** with orthographic camera for premium cel-shaded aesthetic.
 
 ---
 
@@ -35,7 +37,7 @@ bang-bang/
 ├── docs/                          # ← YOU ARE HERE
 │   ├── AGENT_CONTEXT.md           # This file — read first
 │   ├── GDD.md                     # Full Game Design Document (Vietnamese + English terms)
-│   └── ASSET_PIPELINE.md          # AI image generation + post-processing pipeline
+│   └── ASSET_PIPELINE.md          # 3D asset generation + processing pipeline
 │
 ├── packages/
 │   ├── shared/                    # @bang-bang/shared — all type definitions
@@ -76,31 +78,38 @@ bang-bang/
 │   │   │       └── InputBuffer.ts      # Per-player latest input storage
 │   │   └── package.json           # deps: ws, tsx
 │   │
-│   └── client/                    # @bang-bang/client — Phaser 3 game client
-│       ├── src/
-│       │   ├── main.ts            # Phaser game config + boot
-│       │   ├── scenes/
-│       │   │   ├── BootScene.ts   # Asset preloading
-│       │   │   └── GameScene.ts   # Main gameplay scene (dual-mode: local + online)
-│       │   ├── game/
-│       │   │   ├── LocalGameState.ts  # Offline test simulation
-│       │   │   └── OnlineGameState.ts # Online multiplayer state manager
-│       │   ├── input/
-│       │   │   └── InputManager.ts    # WASD + mouse input
-│       │   ├── rendering/
-│       │   │   ├── MapRenderer.ts       # Tilemap rendering
-│       │   │   ├── TankRenderer.ts      # Hull + turret sprite rendering
-│       │   │   ├── ProjectileRenderer.ts
-│       │   │   ├── DummyRenderer.ts     # Dummy target rendering
-│       │   │   └── HUD.ts              # HP bar, cooldowns, minimap
-│       │   └── network/
-│       │       ├── NetworkClient.ts       # WebSocket client + auto-reconnect
-│       │       ├── ClientPrediction.ts    # Optimistic local movement + reconciliation
-│       │       └── EntityInterpolation.ts # Remote entity position smoothing
-│       └── package.json           # deps: phaser, vite
+│   ├── client/                    # LEGACY — Old Phaser 3 client (kept for reference)
+│   │   └── ...                    # Do NOT modify — preserved as migration reference
+│   │
+│   └── client-cocos/              # @bang-bang/client-cocos — Cocos Creator 3.8 (3D)
+│       ├── assets/                # Cocos asset directory
+│       │   ├── scenes/            # Boot.scene, Game.scene, Lobby.scene
+│       │   ├── prefabs/           # Tank.prefab, Projectile.prefab, UI elements
+│       │   ├── scripts/           # TypeScript components
+│       │   │   ├── network/       # NetworkClient, ClientPrediction, EntityInterpolation
+│       │   │   ├── game/          # GameManager, OnlineGameState, LocalGameState
+│       │   │   ├── rendering/     # TankController, ProjectileController, MapController
+│       │   │   ├── ui/            # HUD, MatchOverlay, Minimap, HealthBar
+│       │   │   └── input/         # InputManager (WASD + mouse)
+│       │   ├── models/            # Imported 3D models (.glb)
+│       │   │   ├── tanks/         # Per-tank hull + turret meshes
+│       │   │   ├── environment/   # Boxes, obstacles
+│       │   │   └── projectiles/   # Projectile meshes
+│       │   ├── textures/          # 2D textures (map_bg, UI sprites)
+│       │   ├── materials/         # Cel-shaded materials + effects
+│       │   ├── effects/           # Custom shader effects (.effect)
+│       │   └── animations/        # Cocos animation clips
+│       ├── settings/              # Cocos project settings
+│       └── tsconfig.json
 │
-├── tools/asset-gen/               # Python pipeline for asset processing
-│   └── process_tanks.py           # rembg + OpenCV defringing
+├── tools/
+│   ├── asset-gen/                 # Asset processing scripts
+│   │   └── process_assets.py      # Background removal (rembg)
+│   └── blender/                   # Blender files for 3D tank models
+│       ├── ironman.blend
+│       ├── naruto.blend
+│       ├── spiderman.blend
+│       └── thanhgiong.blend
 │
 ├── package.json                   # Workspace root
 ├── tsconfig.base.json             # Shared TS config (strict, bundler resolution)
@@ -144,11 +153,11 @@ Final_DMG = max(1, floor(Raw_DMG * Mitigation))
 ### 3.4. Evolution (5 Levels = 5 Visual Tiers)
 | Level | Hitbox Scale | Stat Scale | Visual |
 |-------|-------------|------------|--------|
-| 1 (Tier 1) | x1.00 | x1.0 | Base sprite |
-| 2 (Tier 2) | x1.05 | x1.1 | Slight upgrade |
+| 1 (Tier 1) | x1.00 | x1.0 | Base 3D model |
+| 2 (Tier 2) | x1.05 | x1.1 | Slight mesh/material upgrade |
 | 3 (Tier 3) | x1.10 | x1.25 | Major visual change. Unlock Passive. |
-| 4 (Tier 4) | x1.15 | x1.4 | Upgraded sprite |
-| 5 (Tier 5) | x1.20 | x1.6 | Final form. VFX aura. |
+| 4 (Tier 4) | x1.15 | x1.4 | Upgraded model |
+| 5 (Tier 5) | x1.20 | x1.6 | Final form. VFX aura particles. |
 
 ### 3.5. Tank State Machine (6 States)
 `Idle → Moving → Casting → Dashing → Stunned → Dead`
@@ -173,52 +182,28 @@ Final_DMG = max(1, floor(Raw_DMG * Mitigation))
 - TypeScript strict config with brand types
 - All 11 shared type files
 
-### ✅ Phase 2: Local Prototype (COMPLETE)
-- Phaser 3 client with Vite bundler
+### ✅ Phase 2: Local Prototype (COMPLETE — Phaser, Legacy)
+- Phaser 3 client with Vite bundler (preserved in `packages/client/`)
 - Local game simulation (`LocalGameState.ts`)
 - All renderers (Map, Tank, Projectile, HUD, Dummy)
-- Input system (WASD + mouse)
-- BootScene → GameScene flow
 
-### ✅ Phase 3A: Type Alignment (COMPLETE)
-- All types corrected per user feedback (3 skills, 7 stats, no shield/level/exp in snapshot)
-- All server ECS systems rewritten: Movement, Collision, Combat, Projectile, StatusEffect
-- All 3 packages compile clean with `tsc --noEmit`
-
-### ✅ Phase 3B: Networking (COMPLETE — INFRASTRUCTURE)
+### ✅ Phase 3: Networking (COMPLETE — Infrastructure)
 - **Server:** WebSocketServer (port 8080) + Room (60Hz tick) + InputBuffer
 - **Client:** NetworkClient (WS, auto-reconnect, ping/pong) + ClientPrediction + EntityInterpolation
-- Server starts with `npx tsx packages/server/src/main.ts`
-- Client starts with `npm run dev` in packages/client (Vite on :5173)
-
-### ✅ Phase 3C: Wire Online Mode (COMPLETE)
-- GameScene dual-mode: auto-detects server → online (prediction+interpolation) or local fallback
-- `OnlineGameState.ts` wraps NetworkClient + ClientPrediction + EntityInterpolation
-- Server Room spawns projectiles on `input.fire` (fire-rate-gated via AttackTimingComponent)
-- WebSocketServer has CORS headers + `/info` endpoint for server probe
-- HUD shows network status (ping, player count, mode indicator)
-- All 3 packages compile clean
+- Server runs at 60Hz, snapshots broadcast at 20Hz
 
 ### ✅ Phase 4: Match Lifecycle (COMPLETE)
-- Server-side match state machine: WaitingForPlayers → Countdown (3s) → Playing → MatchEnd (8s) → loop
-- Kill/death tracking with per-player and per-team counters
-- 5-second respawn with teleport + full heal
-- Win conditions: first team to 10 kills or 5-minute time limit
-- MatchState included in every snapshot broadcast
-- Client `MatchOverlay.ts`: countdown animation, match timer, team scores, results screen
-- All 3 packages compile clean
+- Server-side match state machine: WaitingForPlayers → Countdown → Playing → MatchEnd → loop
+- Kill/death tracking, 5-second respawn, win conditions
 
 ### ✅ Phase 5: Minimap, Tank Size, Map Rework (COMPLETE)
-- Tank size increased 1.5× (HULL 40→60, TURRET 14×36→21×54)
-- Map reduced from 80×60 to 40×30 grid (1280×960 px playable area)
-- map_bg.png extends 64px beyond grid on each side for visual clarity
-- Arctic theme set as default for both local and online modes
-- New tile types: SteelBox (indestructible) and WoodBox (destructible, 400 HP)
-- Collision map system: ASCII grid in shared/data → parsed by collision-map-loader.ts
-- MapRenderer renders only box sprites on top of static map_bg.png
-- Minimap: 160×120 px in bottom-left, terrain structure from collision grid, entity dots, camera viewport rect
-- Box collision handling in both server (CollisionSystem, ProjectileSystem) and client (LocalGameState)
-- All 3 packages compile clean
+- Collision map system, box tiles, minimap
+
+### 🔄 Phase 6: Cocos Creator Migration (IN PROGRESS)
+- Migrating client from Phaser 3 to Cocos Creator 3.8 with 3D rendering
+- 3D cel-shaded tank models (Blender → .glb → Cocos)
+- Orthographic top-down camera
+- See `docs/ASSET_PIPELINE.md` for 3D asset workflow
 
 ---
 
@@ -226,25 +211,26 @@ Final_DMG = max(1, floor(Raw_DMG * Mitigation))
 
 | Priority | Feature | Notes |
 |----------|---------|-------|
-| ~~HIGH~~ | ~~Wire GameScene → NetworkClient~~ | ✅ Done in Phase 3C |
-| ~~HIGH~~ | ~~Server-side projectile spawning~~ | ✅ Done in Phase 3C |
-| ~~MEDIUM~~ | ~~Match lifecycle~~ | ✅ Done in Phase 4 |
-| ~~LOW~~ | ~~Minimap~~ | ✅ Done in Phase 5 |
+| **HIGH** | Cocos Creator client — full gameplay | Phase 6 in progress |
 | MEDIUM | Game modes (TDM, Base Destroy, CTF) | See GDD §7 |
 | MEDIUM | PVE mode (Co-op Dungeon) | See GDD §8 |
 | LOW | Vision / Fog of War | Server-side culling per player |
-| LOW | Sound effects | Phaser audio system |
+| LOW | Sound effects | Cocos AudioSource component |
 | LOW | Metagame / Garage | Out-match progression (see GDD §9) |
 
 ---
 
-## 6. GRAPHICS STATUS
+## 6. GRAPHICS APPROACH
 
-> ⚠️ **Current graphics are placeholder quality.** The user explicitly stated they will redo all graphics later. Do NOT spend time improving visuals unless the user asks. Focus on logic, networking, and gameplay. See `docs/ASSET_PIPELINE.md` for the image generation + processing pipeline when graphics work begins.
+> **3D Cel-Shaded with Orthographic Camera.** Tanks are low-poly 3D models with a custom cel-shaded material (stepped lighting, bold outlines). The camera is orthographic top-down for consistent gameplay. Map backgrounds remain 2D images rendered on a 3D plane.
 
-Current asset location: `packages/client/public/assets/`
-- Tank sprites: AI-generated, need rework to match original Bang Bang aesthetic (2.5D isometric feel, not flat top-down)
-- Tile sprites: AI-generated, functional but not polished
+Asset locations:
+- **3D models:** `packages/client-cocos/assets/models/tanks/` (`.glb` files)
+- **Textures:** `packages/client-cocos/assets/textures/` (map_bg, UI)
+- **Materials:** `packages/client-cocos/assets/materials/` (cel-shade `.effect`)
+- **Blender source:** `tools/blender/` (`.blend` files)
+
+See `docs/ASSET_PIPELINE.md` for the full 3D modeling + import pipeline.
 
 ---
 
@@ -273,17 +259,20 @@ cd packages/shared && npx tsc
 # Type-check server (no emit)
 npx tsc --project packages/server/tsconfig.json --noEmit
 
-# Type-check client (no emit)
-npx tsc --project packages/client/tsconfig.json --noEmit
-
 # Start game server (port 8080)
 npx tsx packages/server/src/main.ts
 
-# Start client dev server (port 5173)
-cd packages/client && npm run dev
+# Open Cocos Creator client
+# → Open Cocos Dashboard → Add Project → Select packages/client-cocos/
+# → Click Open to launch in Cocos Creator Editor
+# → Press Play button to preview in browser
 
-# Process raw assets (Python)
-cd tools/asset-gen && python process_tanks.py --input ./raw_assets/ --output ./clean_assets/
+# Process raw texture assets
+pip install rembg
+python tools/asset-gen/process_assets.py --input raw.png --output clean.png
+
+# Legacy Phaser client (preserved for reference)
+cd packages/client && npm run dev
 ```
 
 ---
@@ -296,16 +285,17 @@ cd tools/asset-gen && python process_tanks.py --input ./raw_assets/ --output ./c
 4. **Root and Silence are StatusEffects**, NOT TankStates. Only Stun changes TankState.
 5. **No ammo/reload.** Attacks are infinite, gated by `attackSpeed` (attacks per second).
 6. **Circle hitbox for tanks**, AABB for tiles. No `halfWidth`/`halfHeight` on tanks.
-7. **5 levels = 5 visual tiers** (1:1 mapping). Hitbox grows each level.
-8. **Don't touch graphics** unless explicitly asked. Current visuals are placeholders.
-9. **Build shared first** (`cd packages/shared && npx tsc`) before type-checking server/client.
-10. **Use `.js` extensions** in barrel re-exports (`index.ts`) for Vite ESM compatibility.
-11. **TypeScript strict mode** is on: `exactOptionalPropertyTypes`, `noUncheckedIndexedAccess`. Don't use `undefined` where only `number` is expected.
-12. **Server runs at 60Hz**, snapshots broadcast at 20Hz.
-13. **Damage formula:** `Mitigation = 100 / (100 + DEF)`. NOT `1 - DEF/(DEF+CONSTANT)`.
-14. **When referencing GDD:** Sections are in Vietnamese with English terms in parentheses. Use the section numbers (§1, §2, etc.) for cross-references.
-15. **Image-Based UI Only:** Do NOT use HTML/CSS DOM elements for in-game UI. Avoid using raw `Phaser.GameObjects.Graphics` for main UI shapes. All HUD elements (HP bars, Skill slots, Panels) MUST use Phaser Sprites, Image `.setCrop()` for progress bars, or Phaser 3's `NineSlice` for scalable panels. Use stylized Canvas Text with thick strokes and drop-shadows.
-
+7. **5 levels = 5 visual tiers** (1:1 mapping). Each tier = different 3D model or material.
+8. **Build shared first** (`cd packages/shared && npx tsc`) before type-checking server/client.
+9. **Use `.js` extensions** in barrel re-exports (`index.ts`) for ESM compatibility.
+10. **TypeScript strict mode** is on: `exactOptionalPropertyTypes`, `noUncheckedIndexedAccess`.
+11. **Server runs at 60Hz**, snapshots broadcast at 20Hz.
+12. **Damage formula:** `Mitigation = 100 / (100 + DEF)`. NOT `1 - DEF/(DEF+CONSTANT)`.
+13. **When referencing GDD:** Sections are in Vietnamese with English terms in parentheses.
+14. **Cocos Creator 3D mode:** All game objects are 3D nodes. Camera is orthographic top-down. Use `cc` module for Cocos APIs.
+15. **3D Tank prefab hierarchy:** TankRoot → HullMesh + TurretPivot → TurretMesh. Rotation via `Quat.fromEuler()`.
+16. **UI uses Cocos UI system:** `Canvas`, `Label`, `Sprite`, `ProgressBar`, `Layout`. NOT DOM/HTML.
+17. **Do NOT modify `packages/client/`** — it is the legacy Phaser client kept for reference only.
 
 ---
 
@@ -314,5 +304,9 @@ cd tools/asset-gen && python process_tanks.py --input ./raw_assets/ --output ./c
 | Doc | Purpose | What's In It |
 |-----|---------|-------------|
 | [GDD.md](GDD.md) | Game Design Document | Full gameplay rules, modes, mechanics, boss fights, metagame |
-| [ASSET_PIPELINE.md](ASSET_PIPELINE.md) | Art pipeline | AI prompt templates, Python background-removal script, Phaser pivot rules |
+| [ASSET_PIPELINE.md](ASSET_PIPELINE.md) | Art pipeline | 3D modeling workflow, Blender→Cocos, cel-shaded materials, map rendering |
+| [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md) | **Task tracker** | Detailed task breakdown, status, dependencies — pick up your next task here |
+| [MIGRATE_COCOS.md](MIGRATE_COCOS.md) | Migration plan | Original Phaser→Cocos migration design (mostly complete) |
 | [AGENT_CONTEXT.md](AGENT_CONTEXT.md) | **This file** | Architecture, current state, rules for agents |
+
+> **Starting a new session?** After reading this file, check [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md) for the current task list. Find the first `[ ]` task whose dependencies are all `[x]`, do that task, mark it `[x]`, and commit.

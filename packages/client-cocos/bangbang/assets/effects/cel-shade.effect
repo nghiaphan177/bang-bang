@@ -1,0 +1,136 @@
+// Effect Syntax Guide: https://docs.cocos.com/creator/3.8/manual/en/shader/effect-syntax.html
+
+CCEffect %{
+  techniques:
+  - name: cel-shade
+    passes:
+    - vert: cel-vs:vert
+      frag: cel-fs:frag
+      properties:
+        mainColor:    { value: [1, 1, 1, 1], editor: { type: color } }
+        shadowColor:  { value: [0.3, 0.3, 0.4, 1], editor: { type: color } }
+        shadowThreshold: { value: 0.5, editor: { range: [0, 1] } }
+        mainTexture:  { value: white }
+      rasterizerState:
+        cullMode: back
+      depthStencilState:
+        depthTest: true
+        depthWrite: true
+    # Outline pass (inverted hull method)
+    - vert: outline-vs:vert
+      frag: outline-fs:frag
+      properties:
+        outlineColor: { value: [0, 0, 0, 1], editor: { type: color } }
+        outlineWidth: { value: 0.02, editor: { range: [0, 0.1] } }
+      rasterizerState:
+        cullMode: front
+      depthStencilState:
+        depthTest: true
+        depthWrite: true
+}%
+
+// ═══════════════════════════════════════════════════════════════
+// Cel-Shade Main Pass
+// ═══════════════════════════════════════════════════════════════
+
+CCProgram cel-vs %{
+  precision highp float;
+  #include <builtin/uniforms/cc-global>
+  #include <builtin/uniforms/cc-local>
+
+  in vec3 a_position;
+  in vec3 a_normal;
+  in vec2 a_texCoord;
+
+  out vec3 v_worldNormal;
+  out vec3 v_worldPos;
+  out vec2 v_uv;
+
+  vec4 vert () {
+    vec4 worldPos = cc_matWorld * vec4(a_position, 1.0);
+    v_worldPos = worldPos.xyz;
+    v_worldNormal = normalize((cc_matWorldIT * vec4(a_normal, 0.0)).xyz);
+    v_uv = a_texCoord;
+    return cc_matViewProj * worldPos;
+  }
+}%
+
+CCProgram cel-fs %{
+  precision highp float;
+  #include <builtin/uniforms/cc-global>
+
+  in vec3 v_worldNormal;
+  in vec3 v_worldPos;
+  in vec2 v_uv;
+
+  uniform CelShadeUBO {
+    vec4 mainColor;
+    vec4 shadowColor;
+    float shadowThreshold;
+  };
+
+  uniform sampler2D mainTexture;
+
+  vec4 frag () {
+    // Sample base texture
+    vec4 texColor = texture(mainTexture, v_uv);
+    vec4 baseColor = texColor * mainColor;
+
+    // Simple directional light from above-right
+    vec3 lightDir = normalize(vec3(0.3, 1.0, 0.5));
+    float NdotL = dot(normalize(v_worldNormal), lightDir);
+
+    // Stepped shading (2 bands: lit and shadow)
+    float shade = NdotL > shadowThreshold ? 1.0 : 0.0;
+
+    // Mix between shadow and lit color
+    vec3 finalColor = mix(shadowColor.rgb * baseColor.rgb, baseColor.rgb, shade);
+
+    // Add a subtle specular highlight band
+    vec3 viewDir = normalize(cc_cameraPos.xyz - v_worldPos);
+    vec3 halfDir = normalize(lightDir + viewDir);
+    float spec = pow(max(dot(normalize(v_worldNormal), halfDir), 0.0), 32.0);
+    float specStep = spec > 0.5 ? 0.3 : 0.0;
+    finalColor += vec3(specStep);
+
+    return vec4(finalColor, baseColor.a);
+  }
+}%
+
+// ═══════════════════════════════════════════════════════════════
+// Outline Pass (Inverted Hull Method)
+// ═══════════════════════════════════════════════════════════════
+
+CCProgram outline-vs %{
+  precision highp float;
+  #include <builtin/uniforms/cc-global>
+  #include <builtin/uniforms/cc-local>
+
+  in vec3 a_position;
+  in vec3 a_normal;
+
+  uniform OutlineUBO {
+    vec4 outlineColor;
+    float outlineWidth;
+  };
+
+  vec4 vert () {
+    // Expand vertices along normal direction
+    vec3 expandedPos = a_position + a_normal * outlineWidth;
+    vec4 worldPos = cc_matWorld * vec4(expandedPos, 1.0);
+    return cc_matViewProj * worldPos;
+  }
+}%
+
+CCProgram outline-fs %{
+  precision highp float;
+
+  uniform OutlineUBO {
+    vec4 outlineColor;
+    float outlineWidth;
+  };
+
+  vec4 frag () {
+    return outlineColor;
+  }
+}%

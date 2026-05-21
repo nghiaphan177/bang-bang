@@ -3,7 +3,8 @@
 
 **Genre:** 2D Top-down Casual Arena Tank Shooter / Bullet-Hell.
 **Target Tech Stack:** 
-- **Client/UI/Rendering:** Phaser 3 (WebGL/Canvas 2D)
+- **Client/UI/Rendering:** Cocos Creator 3.8 LTS (3D mode, orthographic camera, cel-shaded)
+- **3D Modeling:** Blender 4.x → `.glb` export
 - **Networking:** WebSockets (Server-Authoritative, Client Prediction)
 - **Logic & Data Models:** TypeScript (Strict Typing)
 

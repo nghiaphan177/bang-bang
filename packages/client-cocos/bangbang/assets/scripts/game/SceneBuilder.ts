@@ -1,0 +1,264 @@
+import {
+  Node, Camera, MeshRenderer, primitives, utils, Color, Material,
+  DirectionalLight, Texture2D, resources,
+} from 'cc';
+import { InputManager } from '../input/InputManager';
+import { MapController } from '../rendering/MapController';
+import { ProjectileController } from '../rendering/ProjectileController';
+import { TankController } from '../rendering/TankController';
+import { ARCTIC_COLLISION } from '../shared/data/arctic-collision';
+import { loadCollisionMap } from '../shared/data/collision-map-loader';
+import { TileType } from '../shared/types/environment';
+
+export const TILE_PX = 32;
+
+// ─── Color Palette ────────────────────────────────────────────────
+const COL_HULL      = new Color(60, 140, 70, 255);    // Military green
+const COL_TURRET    = new Color(45, 110, 55, 255);    // Darker green
+const COL_BARREL    = new Color(80, 80, 90, 255);     // Dark steel
+const COL_GROUND    = new Color(90, 95, 85, 255);     // Terrain gray-green
+const COL_ENEMY_H   = new Color(180, 50, 50, 255);    // Red hull
+const COL_ENEMY_T   = new Color(140, 40, 40, 255);    // Dark red turret
+const COL_STEEL     = new Color(130, 140, 150, 255);   // Steel box
+const COL_WOOD      = new Color(140, 100, 55, 255);    // Wood box
+
+export interface SceneRefs {
+  gameCamera: Camera;
+  inputManager: InputManager;
+  mapController: MapController;
+  projectileController: ProjectileController;
+  playerTankController: TankController;
+  remoteTanksContainer: Node;
+}
+
+export class SceneBuilder {
+  private matCache: Map<string, Material> = new Map();
+
+  public build(root: Node): SceneRefs {
+    // ── Camera ─────────────────────────────────────────────────
+    const camNode = new Node('MainCamera');
+    root.addChild(camNode);
+    camNode.setPosition(640, 800, -480);
+    camNode.setRotationFromEuler(-90, 0, 0);
+    const cam = camNode.addComponent(Camera);
+    cam.projection = 1; // ORTHO
+    cam.orthoHeight = 360;
+    cam.near = 1;
+    cam.far = 2000;
+    cam.visibility = 0xffffffff;
+
+    // ── Directional Light ──────────────────────────────────────
+    const lightNode = new Node('DirLight');
+    root.addChild(lightNode);
+    lightNode.setRotationFromEuler(-50, 30, 0);
+    const dirLight = lightNode.addComponent(DirectionalLight);
+    dirLight.illuminance = 80000;
+
+    // ── Game World ─────────────────────────────────────────────
+    const world = new Node('GameWorld');
+    root.addChild(world);
+
+    // ── Ground Plane ───────────────────────────────────────────
+    const mapRoot = new Node('MapRoot');
+    world.addChild(mapRoot);
+
+    const ground = new Node('GroundPlane');
+    mapRoot.addChild(ground);
+    const groundMR = ground.addComponent(MeshRenderer);
+    groundMR.mesh = utils.createMesh(primitives.box({
+      width: 1, height: 0.2, length: 1,
+    }));
+    const mapW = 40 * TILE_PX;
+    const mapH = 30 * TILE_PX;
+    ground.setPosition(mapW / 2, -0.5, mapH / 2);
+    ground.setScale(mapW, 1, mapH);
+
+    this.loadMapBgTexture(groundMR);
+
+    const boxContainer = new Node('BoxContainer');
+    mapRoot.addChild(boxContainer);
+
+    const mapCtrl = mapRoot.addComponent(MapController);
+    mapCtrl.groundPlane = ground;
+    mapCtrl.boxContainer = boxContainer;
+
+    this.spawnCollisionMap(boxContainer);
+
+    // ── Player Tank ────────────────────────────────────────────
+    const playerTank = this.createTankNode('PlayerTank', COL_HULL, COL_TURRET, COL_BARREL);
+    world.addChild(playerTank);
+    const playerTankController = playerTank.getComponent(TankController)!;
+
+    // ── Remote Tanks ───────────────────────────────────────────
+    const remoteTanksContainer = new Node('RemoteTanks');
+    world.addChild(remoteTanksContainer);
+
+    // ── Projectiles ────────────────────────────────────────────
+    const projNode = new Node('Projectiles');
+    world.addChild(projNode);
+    const projectileController = projNode.addComponent(ProjectileController);
+
+    // ── Input ──────────────────────────────────────────────────
+    const inputNode = new Node('InputManager');
+    root.addChild(inputNode);
+    const inputManager = inputNode.addComponent(InputManager);
+    inputManager.gameCamera = cam;
+
+    return {
+      gameCamera: cam,
+      inputManager,
+      mapController: mapCtrl,
+      projectileController,
+      playerTankController,
+      remoteTanksContainer,
+    };
+  }
+
+  public createRemoteTankNode(name: string): Node {
+    return this.createTankNode(name, COL_ENEMY_H, COL_ENEMY_T, COL_BARREL);
+  }
+
+  private createTankNode(
+    name: string,
+    hullColor: Color,
+    turretColor: Color,
+    barrelColor: Color,
+  ): Node {
+    const tankRoot = new Node(name);
+
+    // ── Hull body ──────────────────────────────────────────────
+    const hull = new Node('HullMesh');
+    tankRoot.addChild(hull);
+    const hullMR = hull.addComponent(MeshRenderer);
+    hullMR.mesh = utils.createMesh(primitives.box({
+      width: 28, height: 10, length: 36,
+    }));
+    hullMR.material = this.makeMat(hullColor, `hull_${name}`);
+    hull.setPosition(0, 5, 0);
+
+    const slope = new Node('HullSlope');
+    hull.addChild(slope);
+    const slopeMR = slope.addComponent(MeshRenderer);
+    slopeMR.mesh = utils.createMesh(primitives.box({
+      width: 24, height: 6, length: 8,
+    }));
+    slopeMR.material = this.makeMat(hullColor, `hull_${name}`);
+    slope.setPosition(0, 3, -18);
+
+    const trackMat = this.makeMat(new Color(40, 40, 45, 255), 'track');
+    for (const side of [-1, 1]) {
+      const track = new Node(`Track_${side > 0 ? 'R' : 'L'}`);
+      hull.addChild(track);
+      const trackMR = track.addComponent(MeshRenderer);
+      trackMR.mesh = utils.createMesh(primitives.box({
+        width: 6, height: 8, length: 40,
+      }));
+      trackMR.material = trackMat;
+      track.setPosition(side * 16, -2, 0);
+    }
+
+    const turretPivot = new Node('TurretPivot');
+    tankRoot.addChild(turretPivot);
+    turretPivot.setPosition(0, 12, 0);
+
+    const turretDome = new Node('TurretDome');
+    turretPivot.addChild(turretDome);
+    const domeMR = turretDome.addComponent(MeshRenderer);
+    domeMR.mesh = utils.createMesh(primitives.cylinder(12, 12, 7, {
+      radialSegments: 16,
+    }));
+    domeMR.material = this.makeMat(turretColor, `turretDome_${name}`);
+
+    const barrel = new Node('TurretBarrel');
+    turretPivot.addChild(barrel);
+    const barrelMR = barrel.addComponent(MeshRenderer);
+    barrelMR.mesh = utils.createMesh(primitives.cylinder(2.5, 2.5, 30, {
+      radialSegments: 8,
+    }));
+    barrelMR.material = this.makeMat(barrelColor, `barrel_${name}`);
+    barrel.setPosition(0, 0, -22);
+    barrel.setRotationFromEuler(90, 0, 0);
+
+    const ctrl = tankRoot.addComponent(TankController);
+    ctrl.hullNode = hull;
+    ctrl.turretPivot = turretPivot;
+
+    return tankRoot;
+  }
+
+  private spawnCollisionMap(container: Node): void {
+    const gameMap = loadCollisionMap(ARCTIC_COLLISION);
+    const boxMesh = utils.createMesh(primitives.box({ width: 1, height: 1, length: 1 }));
+    const steelMat = this.makeMat(COL_STEEL, 'steel');
+    const woodMat = this.makeMat(COL_WOOD, 'wood');
+
+    for (let r = 0; r < gameMap.heightGrids; r++) {
+      const row = gameMap.tiles[r];
+      if (!row) continue;
+      for (let c = 0; c < gameMap.widthGrids; c++) {
+        const tile = row[c];
+        if (!tile) continue;
+
+        const wx = c * TILE_PX + TILE_PX / 2;
+        const wz = r * TILE_PX + TILE_PX / 2;
+
+        if (tile.type === TileType.SteelBox) {
+          const box = new Node(`SB_${c}_${r}`);
+          container.addChild(box);
+          const mr = box.addComponent(MeshRenderer);
+          mr.mesh = boxMesh;
+          mr.material = steelMat;
+          box.setPosition(wx, TILE_PX / 2, wz);
+          box.setScale(TILE_PX - 2, TILE_PX - 2, TILE_PX - 2);
+        } else if (tile.type === TileType.WoodBox) {
+          const box = new Node(`WB_${c}_${r}`);
+          container.addChild(box);
+          const mr = box.addComponent(MeshRenderer);
+          mr.mesh = boxMesh;
+          mr.material = woodMat;
+          box.setPosition(wx, TILE_PX / 2, wz);
+          box.setScale(TILE_PX - 2, TILE_PX - 4, TILE_PX - 2);
+        }
+      }
+    }
+    console.log(`[Game] Map loaded: ${gameMap.name} (${gameMap.widthGrids}x${gameMap.heightGrids})`);
+  }
+
+  private loadMapBgTexture(groundMR: MeshRenderer): void {
+    groundMR.material = this.makeMat(COL_GROUND, 'ground');
+
+    resources.load('maps/arctic/map_bg', Texture2D, (err, tex) => {
+      if (err) {
+        resources.load('maps/arctic/map_bg/texture', Texture2D, (err2, tex2) => {
+          if (err2) {
+            console.warn('[Game] map_bg texture not found:', err.message);
+            return;
+          }
+          this.applyMapTexture(groundMR, tex2);
+        });
+        return;
+      }
+      this.applyMapTexture(groundMR, tex);
+    });
+  }
+
+  private applyMapTexture(groundMR: MeshRenderer, tex: Texture2D): void {
+    const mat = new Material();
+    mat.initialize({ effectName: 'builtin-unlit' });
+    mat.setProperty('mainTexture', tex);
+    mat.setProperty('mainColor', new Color(255, 255, 255, 255));
+    groundMR.material = mat;
+    console.log('[Game] Map background texture applied ✓');
+  }
+
+  private makeMat(color: Color, name: string): Material {
+    let mat = this.matCache.get(name);
+    if (mat) return mat;
+
+    mat = new Material();
+    mat.initialize({ effectName: 'builtin-unlit' });
+    mat.setProperty('mainColor', color);
+    this.matCache.set(name, mat);
+    return mat;
+  }
+}

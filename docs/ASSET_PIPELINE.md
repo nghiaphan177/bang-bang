@@ -1,142 +1,198 @@
 # ASSET PIPELINE — Bang Bang Remake
 
-> **Audience:** AI coding agents (Phaser 3 / TypeScript). Follow all rules exactly.
+> **Audience:** AI coding agents (Cocos Creator 3.8 / TypeScript / Blender). Follow all rules exactly.
 
 ---
 
-## 1. Dual-Perspective Visual Split
+## 1. Rendering Architecture
 
-To replicate the authentic premium feel of Bang Bang, the game operates on a two-perspective architectural model:
-1. **Lobby/Garage View:** Tanks are shown in a **2.5D Angled (60-degree)** perspective to showcase maximum character detail and metallic volume.
-2. **In-Game Gameplay View:** The game runs in a **Strictly 90-degree Flat Top-Down** camera angle from the sky. Background tiles are replaced with a continuous artistic map (`map_art.png`), and tanks/projectiles use clean, flat, top-down 90-degree sprites.
+The game uses **3D rendering with an orthographic top-down camera**. Tanks and obstacles are low-poly 3D meshes with cel-shaded materials. Map backgrounds are 2D images rendered on flat 3D planes.
+
+| Element | Rendering Approach |
+|---------|-------------------|
+| **Tanks** | 3D meshes (hull + turret), cel-shaded material with outline |
+| **Projectiles** | 3D meshes with emissive/glow materials |
+| **Map Background** | 2D image on a 3D plane (quad mesh) |
+| **Box Obstacles** | 3D cube meshes with PBR or cel-shaded materials |
+| **Particles/VFX** | Cocos 3D ParticleSystem (muzzle flash, explosions, dust) |
+| **UI/HUD** | Cocos 2D Canvas overlay (ProgressBar, Label, Sprite) |
+| **Camera** | Orthographic, looking straight down (-Y axis) |
 
 ---
 
-## 2. Lobby/Garage Assets (2.5D Angled 60-degree)
+## 2. AI Image Generation Prompts (for textures & concept art)
 
-Lobby assets use a three-quarter isometric projection showing the top and front-side face for three-dimensional depth.
+These prompts are engine-agnostic and used for generating concept art, texture references, and 2D map backgrounds.
 
-### 2.1. Master Lobby Style Prompt
+### 2.1. Lobby/Garage View (2.5D Concept Art)
+Used for reference when modeling 3D tanks in Blender.
+
 ```text
 Clean 2.5D angled game asset, 2010s Flash webgame style. Cel-shaded, vibrant saturated colors. Isometric/three-quarter view showing the top and front-side face for three-dimensional depth. Bold, clean, simplified shapes with no tiny micro-details. THICK, BOLD, CONTINUOUS BLACK OUTLINES around all features. Pronounced shading and cast highlights to emphasize volume. ABSOLUTELY NO GROUND CAST SHADOWS. Isolated on a #FFFFFF pure flat white background.
 ```
 
-### 2.2. Lobby Hull
-```text
-[Master Lobby Style Prompt], a heavy 2.5D tank base hull inspired by [Character Motif]. Saturated metallic armor plating, bold treads on the sides, mechanical details on top. Angled isometric view showing side and front depth.
-```
-
-### 2.3. Lobby Turret
-```text
-[Master Lobby Style Prompt], a detached 2.5D tank turret with a weapon barrel inspired by [Character Motif]. The barrel MUST point directly upwards (12 o'clock / North) in perspective. Saturated colors. Angled view showing the base of the turret clearly.
-```
-
----
-
-## 3. In-Game Gameplay Assets (Flat 90-degree Top-Down)
-
-In-game assets are projected from directly above (sky camera perspective) with no side faces showing.
-
-### 3.1. Master In-Game Style Prompt
-```text
-Clean top-down game asset, 2010s Flash webgame style. Cel-shaded, vibrant saturated colors. Strictly 90-degree flat top-down view (from directly above, sky camera). Bold, clean, simplified shapes with no tiny micro-details. THICK, BOLD, CONTINUOUS BLACK OUTLINES around all features. Pronounced shading and beveled edge highlights to emphasize volume. ABSOLUTELY NO GROUND CAST SHADOWS. Isolated on a #FFFFFF pure flat white background.
-```
-
-### 3.2. Gameplay Hull
-```text
-[Master In-Game Style Prompt]. A heavy tank base hull inspired by [Character Motif], with saturated [Color Schema] metallic armor plating, and bold tracks on the sides.
-```
-
-### 3.3. Gameplay Turret
-```text
-[Master In-Game Style Prompt]. A detached mechanical tank turret with a weapon barrel, colored [Color Schema]. The barrel MUST point directly upwards (12 o'clock / North) in perspective.
-```
-
-### 3.4. Specific Projectiles
-```text
-Clean top-down game asset, 2010s Flash webgame style. Cel-shaded, vibrant saturated colors. Strictly 90-degree flat top-down view (from directly above, sky camera). Bold, clean, simplified shapes. THICK, BOLD, CONTINUOUS BLACK OUTLINES. [Projectile description, e.g., glowing energy repulsor plasma bolt, wind chakra shuriken, web ball, bamboo rod]. Isolated on a #FFFFFF pure flat white background.
-```
-
-### 3.5. Map Art Background (`map_art.png`)
+### 2.2. Map Background (`map_bg.png`)
 ```text
 2D top-down game map background, sci-fi metallic arena battlefield, 2010s Flash webgame style. Cel-shaded, vibrant saturated colors. Strictly 90-degree flat top-down view (viewed from directly above, sky camera). Detailed metallic grid tiles, dirty paths, mechanical structures, glowing power lines, sci-fi details, high contrast. No characters or entities. Seamless flat plane. High quality, premium design.
 ```
 
----
-
-## 4. Grid Environment Tiles
-> Tiles = square tiles representing map grid obstacle elements (Walls/Bushes) laid on top of the map background.
-
+### 2.3. Texture References for 3D Models
+When generating texture sheets for Blender models:
 ```text
-[Master In-Game Style Prompt], a game map block of [a green stealth bush / a destructible red clay brick wall / a steel block], showing a top-down view. Clean cartoon texture.
+Clean flat texture sheet for a low-poly tank model, [Character Motif] themed. Vibrant saturated [Color Schema] metallic colors. Flat projection, no perspective. Bold color blocks suitable for UV mapping. No gradients, use 2-3 flat shading bands. High contrast between light and shadow areas.
 ```
 
 ---
 
-## 3. Post-Processing: Background Removal & Scaling (Python)
+## 3. 3D Model Pipeline (Blender → Cocos Creator)
 
-To remove white anti-aliasing halos and prepare images for Phaser, we use `tools/asset-gen/process_assets.py`. This script performs:
-1. **BFS Flood-Fill Background Removal:** Cleans flat white `#FFFFFF` backgrounds starting from the corners, preserving internal highlight white pixels.
-2. **Auto-Cropping:** Trims empty transparent border pixels to fit bounds.
-3. **Square Padding:** Adds transparent padding to make the image square (essential to prevent off-center wobbles during rotation).
-4. **Lanczos Downsampling:** Resizes cleanly to target resolution (128x128 for tanks, 64x64 for tiles) to prevent blur.
+### 3.1. Modeling Rules (Blender)
 
-### 3.1. Setup & Usage
+Each tank is modeled as **2 separate objects** in a single `.blend` file:
 
-Ensure `Pillow` is installed:
+| Object | Name Convention | Poly Budget | Origin Point |
+|--------|----------------|-------------|-------------|
+| **Hull** | `hull_[tankId]` | 300-800 tris | Center of hull (geometric center) |
+| **Turret** | `turret_[tankId]` | 200-500 tris | Barrel mount point (where turret sits on hull) |
+
+**Modeling guidelines:**
+- **Low-poly cel-shaded style** — simplified shapes, no micro-details
+- **Orientation:** Model facing **+Y** (forward/north) in Blender. Turret barrel points **+Y**.
+- **Scale:** 1 Blender unit = 1 game unit. Hull should be approximately 1.5-2 units wide.
+- **Separate objects:** Hull and Turret MUST be separate objects (not joined) for independent rotation in-game.
+- **Clean topology:** No n-gons, no isolated vertices. Manifold meshes preferred.
+- **UV unwrapped:** Simple UV layout for texture painting. Use color-ID maps if needed.
+
+### 3.2. Material Setup (Cocos Creator)
+
+Tanks use a **custom cel-shaded Effect** (`.effect` file) in Cocos Creator:
+
+```
+Cel-Shade Material Properties:
+├── Base Color (diffuse texture or flat color)
+├── Shadow Color (darker version, 2-3 step threshold)
+├── Outline Width (inverted-hull method, 1-3px screen-space)
+├── Outline Color (usually black or very dark version of base)
+└── Specular Band (optional: single bright highlight step)
+```
+
+**Outline method:** Inverted-hull (duplicate mesh, flip normals, scale slightly outward, render back-faces only with solid outline color). This is the standard cel-shading outline for real-time 3D games.
+
+### 3.3. Export Settings (Blender → .glb)
+
+```
+File → Export → glTF 2.0 (.glb)
+├── Format: glTF Binary (.glb)
+├── Include: Selected Objects only
+├── Transform:
+│   ├── +Y Up (default)
+│   └── Apply Modifiers: ✅
+├── Mesh:
+│   ├── Apply Modifiers: ✅
+│   ├── Normals: ✅
+│   ├── UVs: ✅
+│   └── Vertex Colors: ✅ (if used for color-ID)
+├── Materials: Export (for reference, will be replaced in Cocos)
+└── Animation: None (static meshes for now)
+```
+
+### 3.4. Import into Cocos Creator
+
+1. Copy `.glb` files to `packages/client-cocos/assets/models/tanks/`
+2. Cocos auto-generates `.meta` files and creates `Mesh`, `Material`, `Prefab` assets
+3. In Cocos Editor:
+   - Create new **Prefab** for the tank
+   - Add HullMesh as child node with `MeshRenderer` component
+   - Add TurretPivot (empty Node) at mount point position
+   - Add TurretMesh as child of TurretPivot with `MeshRenderer`
+   - Assign cel-shaded material to both MeshRenderers
+   - Attach `TankController` script to root node
+
+### 3.5. Tank Prefab Hierarchy
+
+```
+TankRoot (Node3D) — TankController.ts component
+├── HullMesh (MeshRenderer + CelShadeMaterial)
+│   └── DustEmitter (ParticleSystem — emits when moving)
+├── TurretPivot (empty Node3D, position = hull mount point)
+│   ├── TurretMesh (MeshRenderer + CelShadeMaterial)
+│   └── MuzzlePoint (empty Node3D — particle spawn point)
+│       └── MuzzleFlash (ParticleSystem — burst on fire)
+├── Shadow (Sprite3D or projected shadow plane)
+└── HPBarAnchor (empty Node3D — world-space anchor for billboard HP bar)
+```
+
+### 3.6. Evolution Tiers (5 Visual Levels)
+
+| Tier | 3D Model Change | Material Change |
+|------|----------------|-----------------|
+| Tier 1 | Base model | Base cel-shade colors |
+| Tier 2 | Same model, scale x1.05 | Slightly upgraded colors |
+| Tier 3 | New model (more detail) | New color palette, unlock passive VFX |
+| Tier 4 | Same as Tier 3, scale x1.10 | Premium metallic accents |
+| Tier 5 | Final model (most detail) | Glowing aura particles, emissive accents |
+
+---
+
+## 4. 2D Texture Pipeline (Map Backgrounds & UI)
+
+### 4.1. Background Removal
+
+For 2D textures that need background removal (concept art, AI-generated images):
+
 ```bash
-pip install pillow
+# Install rembg (one-time)
+pip install rembg[gpu]  # GPU-accelerated, or just `pip install rembg`
+
+# Remove background
+rembg i input.png output.png
+
+# Batch process
+rembg p input_folder/ output_folder/
 ```
 
-Run the processor script:
-```bash
-# Process a tank hull
-python tools/asset-gen/process_assets.py --input raw_hulls/ironman.png --output packages/client/public/assets/hulls/ironman.png --size 128 --tolerance 35
+The old Python BFS flood-fill script (`process_assets.py`) is replaced by `rembg` which uses a neural network for much higher quality background removal.
 
-# Process a tile block (e.g. brick wall)
-python tools/asset-gen/process_assets.py --input raw_tiles/brick.png --output packages/client/public/assets/tiles/brick.png --size 64 --tolerance 30
-```
+### 4.2. Map Background Images
+
+Map backgrounds are still 2D images, rendered on a flat 3D plane in the game world:
+
+1. Generate or paint `map_bg.png` (recommended: 2048x2048 or 4096x4096 for high quality)
+2. Place in `packages/client-cocos/assets/textures/maps/<theme>/map_bg.png`
+3. In Cocos Editor: Create a `Plane` mesh at Y=0, apply `map_bg.png` as diffuse texture
+4. Scale plane to match grid dimensions (e.g., 40×30 grid × 32px/tile = 1280×960 world units)
+
+### 4.3. UI Assets
+
+All HUD/UI is built using Cocos Creator's 2D UI system (Canvas overlay):
+
+- **ProgressBar** component for HP bars and skill cooldowns (built-in!)
+- **Sprite** with `fillRange` for radial cooldown indicators
+- **Label** with custom fonts (import `.ttf` or `.otf` into Cocos)
+- **Layout** component for auto-arranging UI elements
+- **Widget** component for screen-edge anchoring
+- **NineSlice** (Sprite with sliced mode) for scalable panel backgrounds
+
+No procedural Canvas Graphics code needed — design everything visually in Cocos Editor.
 
 ---
 
-## 4. UI & HUD Assets Pipeline
+## 5. Environment 3D Assets
 
-All HUD overlays, slots, and panels must be image-based and rendered inside the Phaser Canvas.
+### 5.1. Box Obstacles
 
-### 4.1. Prompts for UI Assets
+| Box Type | Mesh | Material | Notes |
+|----------|------|----------|-------|
+| **SteelBox** | Simple cube (8 tris) | Dark metallic with rivets normal map | Indestructible |
+| **WoodBox** | Simple cube (8 tris) | Wood diffuse texture | Destructible (400 HP), shows damage states |
+| **Rubble** | 3-5 small irregular shapes | Dark brown, semi-transparent | Spawned when WoodBox destroyed |
 
-1. **Master UI Prompt:** "2012 Flash webgame UI element, sci-fi mechanical style. Chunky, heavy metallic borders with glowing accents, glossy beveled edges, high contrast. Isolated on pure white background. Flat projection. Thick black outlines."
-2. **Skill Slot Frame:** "[Master UI Prompt], a square empty frame to hold a skill icon. Thick bolted borders, dark hollow center."
-3. **HP Bar Frame:** "[Master UI Prompt], a long horizontal metallic empty casing for a health bar. Thick borders."
-4. **HP Bar Fill:** "[Master UI Prompt], a glassy, glowing [green/yellow/red] horizontal progress bar fill. Beveled edges, specular highlights, looking like liquid in a tube."
-5. **HUD Panels:** "[Master UI Prompt], a rectangular sci-fi screen panel background with bolted corners. Perfect for 9-slice scaling."
+### 5.2. Water & Bush Tiles
 
-### 4.2. Phaser Integration Rules
-- **Progress Bars:** DO NOT use `.setScaleX()` (it squishes details and bevels). Instead, use `fill.setCrop(0, 0, originalWidth * ratio, originalHeight)` to deplete the bar dynamically like liquid in a tube.
-- **HUD Layout Panels:** Use Phaser 3's `NineSlice` Game Object with the `ui_hud_panel` texture to scale panel backgrounds to any size without stretching the bolted corners.
-- **Procedural Fallback:** `packages/client/src/scenes/BootScene.ts` contains `generateUIFallbacks()` to procedurally generate all UI assets as a fallback using Canvas Graphics to prevent load failures.
-- **Typography:** Avoid default sans-serif fonts. Use stylized impact fonts with outlines and drop-shadows:
-  ```typescript
-  scene.add.text(x, y, text, {
-    fontFamily: 'Impact, Arial Black',
-    fontSize: '14px',
-    color: '#FFFFFF',
-    stroke: '#000000',
-    strokeThickness: 4,
-    shadow: { offsetX: 2, offsetY: 2, color: '#000000', stroke: true, fill: true }
-  });
-  ```
-
----
-
-## 5. Phaser 3 Pivot Alignment Rules
-
-When integrating a tank into Phaser, these origin values are **mandatory**:
-
-| Part | `setOrigin()` | Why |
-|------|--------------|-----|
-| **Hull** | `(0.5, 0.5)` | Rotates around center |
-| **Turret** | `(0.5, 0.80)` | Rotates around barrel base (mount point on hull). Adjust Y between 0.80–0.85 per barrel length |
+| Tile | Approach |
+|------|----------|
+| **Water** | Plane mesh with animated UV-scrolling water shader |
+| **Bush** | Billboard sprites or low-poly foliage mesh clusters |
 
 ---
 
@@ -144,43 +200,76 @@ When integrating a tank into Phaser, these origin values are **mandatory**:
 
 ```
 bang-bang/
-├── docs/                           # Documentation
-│   ├── ASSET_PIPELINE.md
-│   └── AGENT_CONTEXT.md
-├── tools/asset-gen/                # Python pipeline scripts
-│   └── process_assets.py
-└── packages/client/public/assets/  # Final processed game assets
-    ├── hulls/                      # Transparent 128x128 top-down tank hulls (gameplay)
-    ├── turrets/                    # Transparent 128x128 top-down tank turrets (gameplay)
-    ├── projectiles/                # Transparent 32x32 projectile sprites
-    ├── lobby/                      # Angled 2.5D assets for garage/lobby
-    │   ├── hulls/
-    │   └── turrets/
-    └── maps/                       # Per-map static background images
-        ├── default/
-        │   └── map_bg.png          # Full-map unified static background (1024x1024+)
-        └── arctic/
-            └── map_bg.png          # Arctic Polar themed background
+├── tools/
+│   ├── asset-gen/
+│   │   └── process_assets.py          # rembg-based background removal
+│   └── blender/                       # Blender source files
+│       ├── ironman.blend
+│       ├── naruto.blend
+│       ├── spiderman.blend
+│       ├── thanhgiong.blend
+│       └── environment.blend          # Shared box/obstacle meshes
+│
+└── packages/client-cocos/assets/      # Cocos Creator asset directory
+    ├── models/
+    │   ├── tanks/
+    │   │   ├── ironman_hull.glb
+    │   │   ├── ironman_turret.glb
+    │   │   ├── naruto_hull.glb
+    │   │   └── ...
+    │   ├── environment/
+    │   │   ├── steel_box.glb
+    │   │   ├── wood_box.glb
+    │   │   └── rubble.glb
+    │   └── projectiles/
+    │       ├── beam.glb
+    │       └── ...
+    ├── textures/
+    │   ├── maps/
+    │   │   ├── default/map_bg.png
+    │   │   └── arctic/map_bg.png
+    │   ├── tanks/                     # Diffuse textures for tank models
+    │   └── ui/                        # UI sprite sheets
+    ├── materials/
+    │   ├── cel-shade.mtl              # Cel-shaded material instance
+    │   └── outline.mtl                # Outline pass material
+    ├── effects/
+    │   └── cel-shade.effect           # Custom cel-shade shader
+    ├── prefabs/
+    │   ├── tanks/
+    │   │   ├── IronMan.prefab
+    │   │   ├── Naruto.prefab
+    │   │   └── ...
+    │   ├── Projectile.prefab
+    │   └── ui/
+    │       ├── HealthBar.prefab
+    │       └── SkillSlot.prefab
+    └── scenes/
+        ├── Boot.scene
+        ├── Game.scene
+        └── Lobby.scene
 ```
 
-## 7. Map Rendering Architecture (Static Image + Collision Matrix)
+---
+
+## 7. Map Rendering Architecture (3D Plane + Collision Matrix)
 
 ### Core Concept
-The map visual and the map collision are **completely separate**:
+The map visual and the map collision remain **completely separate** (same as before):
 
 | Layer | Responsibility |
 |-------|---------------|
-| **Client (MapRenderer)** | Renders ONE static image as the entire map background. No tile sprites. Walls, water, bushes are all baked into the image. |
-| **Server / LocalGameState** | Maintains a hidden **collision matrix** (`map.tiles[][]`) — a 2D grid where each cell is Ground, BrickWall, SteelWall, Water, or Bush. This drives movement blocking, projectile collision, stealth, etc. |
+| **Client (MapController)** | Renders a 3D Plane with `map_bg.png` texture. Box obstacles are 3D cube meshes placed at grid positions on top of the plane. |
+| **Server / GameState** | Maintains a hidden **collision matrix** (`map.tiles[][]`) — a 2D grid for movement blocking, projectile collision, stealth. |
 
 ### How It Works
-1. The AI generates a beautiful unified map image with walls, rivers, bushes visible
-2. The collision matrix is defined separately in code (e.g. `maps.ts`)
-3. Client stretches the image to fit the map dimensions
-4. When a brick wall is destroyed, a small rubble overlay is placed at that grid cell
+1. The AI generates a beautiful unified map image (top-down view)
+2. The collision matrix is defined in code (`shared/src/data/`)
+3. MapController creates a Plane mesh, applies texture, scales to grid dimensions
+4. Box obstacles are instantiated as 3D cube prefabs at grid coordinates
+5. When a WoodBox is destroyed: remove mesh, spawn rubble particles
 
 ### Adding a New Map
-1. Create `packages/client/public/assets/maps/<theme_name>/map_bg.png`
-2. Add a collision matrix in `packages/server/src/data/maps.ts`
-3. Add the theme key to `THEME_BG` in `MapRenderer.ts`
-4. Add the preload line in `BootScene.ts`
+1. Create `packages/client-cocos/assets/textures/maps/<theme>/map_bg.png`
+2. Add a collision matrix in `packages/shared/src/data/`
+3. Register the theme in `MapController.ts`
