@@ -80,8 +80,13 @@ export class CombatSystem {
 
       target.health.hp = Math.max(0, target.health.hp - actualDamage);
 
-      // Apply status effects from projectile if any
       const projEntity = entities.get(hit.projectileId as any);
+      if (projEntity?.projectile?.ownerId && actualDamage > 0) {
+        if (!target.recentDamage) target.recentDamage = [];
+        target.recentDamage.push({ attackerId: projEntity.projectile.ownerId, timestamp: Date.now() });
+      }
+
+      // Apply status effects from projectile if any
       if (projEntity?.projectile?.effects) {
         for (const effect of projEntity.projectile.effects) {
           StatusEffectSystem.applyEffect(

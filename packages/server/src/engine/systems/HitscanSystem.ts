@@ -92,6 +92,10 @@ export class HitscanSystem {
           // Apply damage
           const finalDamage = combatSystem.calculateDamage(rawDamage, channel, target.combatStats!);
           target.health.hp = Math.max(0, target.health.hp - finalDamage);
+          if (finalDamage > 0) {
+            if (!target.recentDamage) target.recentDamage = [];
+            target.recentDamage.push({ attackerId: caster.id, timestamp: Date.now() });
+          }
 
           // Apply skill status effects (e.g. BURN)
           if (skillDef.effects) {
@@ -125,6 +129,10 @@ export class HitscanSystem {
           // Apply damage
           const finalDamage = combatSystem.calculateDamage(rawDamage, channel, target.combatStats!);
           target.health.hp = Math.max(0, target.health.hp - finalDamage);
+          if (finalDamage > 0) {
+            if (!target.recentDamage) target.recentDamage = [];
+            target.recentDamage.push({ attackerId: caster.id, timestamp: Date.now() });
+          }
 
           // Apply skill status effects (e.g. SLOW)
           if (skillDef.effects) {

@@ -215,6 +215,10 @@ export class ProjectileSystem {
                   tile.destroyed = true;
                   tile.hp = 0;
                   state.setTile(col, row, { type: TileType.Ground });
+                  const owner = entities.get(pc.ownerId);
+                  if (owner?.evolution) {
+                    owner.evolution.currentExp += 10;
+                  }
                 }
               }
               pc.phase = ProjectilePhase.Hit;

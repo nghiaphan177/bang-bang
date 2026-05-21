@@ -98,6 +98,10 @@ export class DashSystem {
                   other.combatStats!
                 );
                 other.health.hp = Math.max(0, other.health.hp - finalDamage);
+                if (finalDamage > 0) {
+                  if (!other.recentDamage) other.recentDamage = [];
+                  other.recentDamage.push({ attackerId: tank.id, timestamp: Date.now() });
+                }
               }
 
               // Apply status effects on hit (e.g. STUN)
