@@ -31,6 +31,7 @@ export interface RenderableTank {
   isPlayer?: boolean;
   isAlly?: boolean;
   level?: number;
+  spawnProtectionMs?: number;
 }
 
 @ccclass('TankController')
@@ -55,6 +56,7 @@ export class TankController extends Component {
   private redMat: Material | null = null;
   private isFlashing = false;
   private shimmerCount = 30;
+  private spawnShieldNode: Node | null = null;
 
   updateFromState(data: RenderableTank): void {
     const worldX = data.transform.position.x * TILE_PX;
@@ -91,6 +93,21 @@ export class TankController extends Component {
       const fillWidth = 30 * ratio;
       this.hpBarFill.setScale(fillWidth, 1.1, 2.6);
       this.hpBarFill.setPosition(-15 + fillWidth / 2, 0.2, 0);
+    }
+
+    // ── Spawn Protection Shield Ring ────────────────────────────
+    const hasProtection = (data.spawnProtectionMs ?? 0) > 0;
+    if (hasProtection && !this.spawnShieldNode) {
+      this.spawnShieldNode = new Node('SpawnShield');
+      this.node.addChild(this.spawnShieldNode);
+      const shieldMR = this.spawnShieldNode.addComponent(MeshRenderer);
+      shieldMR.mesh = utils.createMesh(primitives.torus(22, 3, { radialSegments: 24, tubularSegments: 12 }));
+      shieldMR.material = this.makeMat(new Color(100, 200, 255, 150));
+      this.spawnShieldNode.setPosition(0, 8, 0);
+      this.spawnShieldNode.setRotationFromEuler(90, 0, 0);
+    }
+    if (this.spawnShieldNode) {
+      this.spawnShieldNode.active = hasProtection;
     }
 
     // ── Hull Rotation (Y-axis, smooth lerp) ────────────────────

@@ -86,6 +86,10 @@ export interface TankSnapshot {
   readonly isAlive: boolean;
   readonly team: TeamId;
   readonly level: number;
+  /** Remaining spawn protection in ms (0 = none). Client shows invuln glow. */
+  readonly spawnProtectionMs?: number;
+  /** Display name for scoreboard / kill feed */
+  readonly playerName?: string;
 }
 
 /** Full authoritative game state for a tick */

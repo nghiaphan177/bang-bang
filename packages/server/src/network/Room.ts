@@ -57,10 +57,19 @@ const SNAPSHOT_EVERY_N_TICKS = Math.round(TICK_RATE / SNAPSHOT_SEND_RATE);
 // ─── Match Config ────────────────────────────────────────────────
 const MIN_PLAYERS_TO_START = 1;          // 1 for dev testing
 const COUNTDOWN_SEC = 3;
-const MATCH_TIME_LIMIT_SEC = 300;        // 5 minutes
-const KILL_TARGET = 10;                  // First to N kills wins
+const MATCH_TIME_LIMIT_SEC = 600;        // 10 minutes (GDD §7.1)
+const KILL_TARGET = 25;                  // First to 25 kills wins (GDD §7.1)
 const RESPAWN_DELAY_MS = 5000;           // 5 seconds
 const MATCH_END_DISPLAY_SEC = 8;         // Results screen duration
+
+// ─── Safe Zone (GDD §7.1) ────────────────────────────────────────
+const SAFE_ZONES: Record<string, { minX: number; minY: number; maxX: number; maxY: number }> = {
+  [TeamId.Red]: { minX: 1, minY: 1, maxX: 8, maxY: 8 },
+  [TeamId.Blue]: { minX: 72, minY: 52, maxX: 79, maxY: 59 },
+};
+const SAFE_ZONE_ENEMY_DPS = 2000;        // True damage per second to enemies
+const SAFE_ZONE_HEAL_PER_SEC = 0.10;     // 10% maxHP/sec heal for allies
+const SPAWN_PROTECTION_MS = 3000;        // 3 seconds invulnerability on respawn
 
 export interface RoomPlayer {
   playerId: PlayerId;
@@ -328,6 +337,9 @@ export class Room {
     // 1. Apply buffered inputs
     this.applyInputs();
 
+    // 1.1 Process spawn protection (before combat, cancels on attack)
+    this.processSpawnProtection(dt);
+
     // 1.3 Process skill activations
     this.processSkillActivations(dt);
 
@@ -361,7 +373,10 @@ export class Room {
     // 4. Process respawn queue
     this.processRespawns();
 
-    // 5. Check win conditions
+    // 5. Safe Zone mechanics (heal allies, damage enemies)
+    this.processSafeZones(dt);
+
+    // 6. Check win conditions
     this.checkWinConditions();
   }
 
@@ -572,7 +587,10 @@ export class Room {
       entity.statusEffects.effects = [];
     }
 
-    console.log(`[Room ${this.id}] Player ${playerId} respawned`);
+    // Spawn protection: 3 seconds invulnerability
+    entity.spawnProtectionMs = SPAWN_PROTECTION_MS;
+
+    console.log(`[Room ${this.id}] Player ${playerId} respawned (3s protection)`);
   }
 
   private findPlayerByEntityId(entityId: EntityId): RoomPlayer | undefined {
@@ -1144,6 +1162,61 @@ export class Room {
       onHitEffects: [...(skillDef.effects ?? [])],
       hitEntities: new Set(),
     };
+  }
+
+  // ═══════════════════════════════════════════════════════════════
+  // SAFE ZONE & SPAWN PROTECTION
+  // ═══════════════════════════════════════════════════════════════
+
+  private processSafeZones(dt: number): void {
+    const em = this.gameState.entityManager;
+    const dtSec = dt / 1000;
+
+    for (const tank of em.getTanks()) {
+      if (!tank.health?.isAlive || !tank.transform || !tank.tankIdentity) continue;
+      const { x, y } = tank.transform.position;
+      const team = tank.tankIdentity.team as string;
+
+      for (const [zoneTeam, zone] of Object.entries(SAFE_ZONES)) {
+        const inside = x >= zone.minX && x <= zone.maxX && y >= zone.minY && y <= zone.maxY;
+        if (!inside) continue;
+
+        if (team === zoneTeam) {
+          // Ally in own safe zone: heal 10% maxHP/sec
+          const healAmount = Math.floor(tank.health.maxHp * SAFE_ZONE_HEAL_PER_SEC * dtSec);
+          tank.health.hp = Math.min(tank.health.maxHp, tank.health.hp + healAmount);
+        } else {
+          // Enemy in our safe zone: 2000 True DPS
+          const dmg = Math.floor(SAFE_ZONE_ENEMY_DPS * dtSec);
+          tank.health.hp = Math.max(0, tank.health.hp - dmg);
+          if (tank.health.hp <= 0) {
+            tank.health.isAlive = false;
+            if (tank.tankState) {
+              tank.tankState.current = TankState.Dead;
+            }
+          }
+        }
+      }
+    }
+  }
+
+  private processSpawnProtection(dt: number): void {
+    const em = this.gameState.entityManager;
+    for (const tank of em.getTanks()) {
+      if (tank.spawnProtectionMs == null || tank.spawnProtectionMs <= 0) continue;
+
+      // Cancel immediately if firing or using skill (GDD §7.1)
+      if (tank.input?.fire || tank.input?.skillE || tank.input?.skillSpace) {
+        tank.spawnProtectionMs = 0;
+        continue;
+      }
+
+      // Tick down
+      tank.spawnProtectionMs -= dt;
+      if (tank.spawnProtectionMs <= 0) {
+        tank.spawnProtectionMs = 0;
+      }
+    }
   }
 
   private sendToPlayer(player: RoomPlayer, msg: ServerMessage): void {

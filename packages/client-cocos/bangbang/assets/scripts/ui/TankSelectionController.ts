@@ -3,7 +3,7 @@
  */
 
 import {
-  _decorator, Component, Node, Graphics, Label, Color, UITransform, LabelOutline, Layers, BlockInputEvents
+  _decorator, Component, Node, Graphics, Label, Color, UITransform, LabelOutline, Layers, BlockInputEvents, input, Input, Vec3
 } from 'cc';
 import { TankId } from '../shared/types/tank';
 import { TANK_ROSTER } from '../shared/data/tank-roster';
@@ -32,16 +32,26 @@ export class TankSelectionController extends Component {
     bgBlockerNode.layer = Layers.Enum.UI_2D;
     const bgTrans = bgBlockerNode.addComponent(UITransform);
     bgTrans.setContentSize(1280, 720);
-    bgBlockerNode.addComponent(BlockInputEvents);
     this.node.addChild(bgBlockerNode);
     this.bgGraphics = bgBlockerNode.addComponent(Graphics);
 
-    bgBlockerNode.on(Node.EventType.TOUCH_START, (event: any) => {
-      event.propagationStopped = true;
-    });
-    bgBlockerNode.on(Node.EventType.MOUSE_DOWN, (event: any) => {
-      event.propagationStopped = true;
-    });
+    // Stop propagation of all interaction events on the blocker node
+    // to prevent clicks from passing through to the game scene.
+    // By not using the BlockInputEvents component, we avoid its issues
+    // where it intercepts events before sibling nodes (cards/buttons) can process them.
+    const blockEvents = [
+      Node.EventType.TOUCH_START,
+      Node.EventType.TOUCH_MOVE,
+      Node.EventType.TOUCH_END,
+      Node.EventType.MOUSE_DOWN,
+      Node.EventType.MOUSE_MOVE,
+      Node.EventType.MOUSE_UP,
+    ];
+    for (const evt of blockEvents) {
+      bgBlockerNode.on(evt, (event: any) => {
+        event.propagationStopped = true;
+      });
+    }
 
     // 1. Title Label
     const titleNode = new Node('TitleLabel');
@@ -155,15 +165,15 @@ export class TankSelectionController extends Component {
       passiveLabel.color = new Color(245, 176, 65, 255);
       passiveLabel.overflow = 3; // RESIZE_HEIGHT
 
-      // Event listener for click/tap
-      cardNode.on(Node.EventType.TOUCH_START, (event: any) => {
+      // Event listener for click/tap (registered on both node and graphics child for maximum reliability)
+      const selectHandler = (event: any) => {
         this.selectTank(id);
         event.propagationStopped = true;
-      });
-      cardNode.on(Node.EventType.MOUSE_DOWN, (event: any) => {
-        this.selectTank(id);
-        event.propagationStopped = true;
-      });
+      };
+      cardNode.on(Node.EventType.TOUCH_START, selectHandler);
+      cardNode.on(Node.EventType.MOUSE_DOWN, selectHandler);
+      cardGraphicsNode.on(Node.EventType.TOUCH_START, selectHandler);
+      cardGraphicsNode.on(Node.EventType.MOUSE_DOWN, selectHandler);
 
       this.cards.set(id, { bgGraphics, node: cardNode });
     }
@@ -196,25 +206,105 @@ export class TankSelectionController extends Component {
     btnOutline.color = new Color(0, 0, 0, 255);
     btnOutline.width = 2;
 
-    battleBtnNode.on(Node.EventType.TOUCH_START, (event: any) => {
+    // Event listener for click/tap (registered on both node and graphics child for maximum reliability)
+    const confirmHandler = (event: any) => {
       if (this.confirmCallback) {
         this.confirmCallback(this.selectedId);
       }
       event.propagationStopped = true;
-    });
-    battleBtnNode.on(Node.EventType.MOUSE_DOWN, (event: any) => {
-      if (this.confirmCallback) {
-        this.confirmCallback(this.selectedId);
-      }
-      event.propagationStopped = true;
-    });
+    };
+    battleBtnNode.on(Node.EventType.TOUCH_START, confirmHandler);
+    battleBtnNode.on(Node.EventType.MOUSE_DOWN, confirmHandler);
+    btnGraphicsNode.on(Node.EventType.TOUCH_START, confirmHandler);
+    btnGraphicsNode.on(Node.EventType.MOUSE_DOWN, confirmHandler);
+
+    // --- On-screen Debug Console for Lobby ---
+    const debugNode = new Node('DebugConsole');
+    debugNode.layer = Layers.Enum.UI_2D;
+    this.node.addChild(debugNode);
+    debugNode.setPosition(0, -320, 0); // At the very bottom
+    this.debugLabel = debugNode.addComponent(Label);
+    this.debugLabel.fontSize = 11;
+    this.debugLabel.color = new Color(241, 196, 15, 255); // Yellow warning color
+    const debugOutline = debugNode.addComponent(LabelOutline);
+    debugOutline.color = new Color(0, 0, 0, 255);
+    debugOutline.width = 1.5;
+
+    this.logDebug("Lobby initialized. Click/tap anywhere to choose.");
+
+    // Global event listeners on input singleton as a 100% reliable fallback
+    input.on(Input.EventType.TOUCH_START, this.onGlobalTouch, this);
+    input.on(Input.EventType.MOUSE_DOWN, this.onGlobalTouch, this);
 
     this.redraw();
+  }
+
+  private debugLabel: Label | null = null;
+  private debugLogs: string[] = [];
+
+  private logDebug(msg: string): void {
+    console.log(`[Lobby UI] ${msg}`);
+    this.debugLogs.push(msg);
+    if (this.debugLogs.length > 5) {
+      this.debugLogs.shift();
+    }
+    if (this.debugLabel) {
+      this.debugLabel.string = this.debugLogs.join('\n');
+    }
+  }
+
+  private onGlobalTouch(event: any): void {
+    const loc = event.getUILocation ? event.getUILocation() : event.getLocation();
+    this.logDebug(`Touch at UI coord: (${loc.x.toFixed(1)}, ${loc.y.toFixed(1)})`);
+
+    // Manually hit test roster cards
+    for (const [id, card] of this.cards) {
+      const trans = card.node.getComponent(UITransform);
+      if (trans) {
+        const localPos = new Vec3();
+        trans.convertToNodeSpaceAR(new Vec3(loc.x, loc.y, 0), localPos);
+        const w = trans.width;
+        const h = trans.height;
+        const inside = Math.abs(localPos.x) <= w / 2 && Math.abs(localPos.y) <= h / 2;
+        if (inside) {
+          this.logDebug(`Selected card: ${id}`);
+          this.selectTank(id);
+          event.propagationStopped = true;
+          return;
+        }
+      }
+    }
+
+    // Manually hit test battle button
+    const battleBtn = this.node.getChildByName('BattleButton');
+    if (battleBtn) {
+      const trans = battleBtn.getComponent(UITransform);
+      if (trans) {
+        const localPos = new Vec3();
+        trans.convertToNodeSpaceAR(new Vec3(loc.x, loc.y, 0), localPos);
+        const w = trans.width;
+        const h = trans.height;
+        const inside = Math.abs(localPos.x) <= w / 2 && Math.abs(localPos.y) <= h / 2;
+        if (inside) {
+          this.logDebug("Battle button clicked! Commencing...");
+          if (this.confirmCallback) {
+            this.confirmCallback(this.selectedId);
+          }
+          event.propagationStopped = true;
+          return;
+        }
+      }
+    }
   }
 
   private selectTank(id: TankId): void {
     this.selectedId = id;
     this.redraw();
+  }
+
+  onDestroy(): void {
+    input.off(Input.EventType.TOUCH_START, this.onGlobalTouch, this);
+    input.off(Input.EventType.MOUSE_DOWN, this.onGlobalTouch, this);
   }
 
   private redraw(): void {

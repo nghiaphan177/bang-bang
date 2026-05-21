@@ -74,6 +74,9 @@ export class GameState {
         isAlive: entity.health.isAlive,
         team: entity.tankIdentity.team,
         level: entity.evolution?.level ?? 1,
+        ...(entity.spawnProtectionMs != null && entity.spawnProtectionMs > 0
+          ? { spawnProtectionMs: entity.spawnProtectionMs }
+          : {}),
       });
     }
 

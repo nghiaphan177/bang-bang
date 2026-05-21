@@ -237,4 +237,6 @@ export interface GameEntity {
   castState?: CastStateComponent;
   evolution?: EvolutionComponent;
   recentDamage?: Array<{ attackerId: EntityId; timestamp: number }>;
+  /** Spawn protection countdown in ms. While > 0, tank is invulnerable. */
+  spawnProtectionMs?: number;
 }

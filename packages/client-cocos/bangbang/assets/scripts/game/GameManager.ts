@@ -232,6 +232,7 @@ export class GameManager extends Component {
         if (me) {
           rd.health = { hp: me.hp, maxHp: me.maxHp, isAlive: me.isAlive };
           rd.level = me.level;
+          rd.spawnProtectionMs = me.spawnProtectionMs ?? 0;
         }
       }
       this.playerTankController.updateFromState(rd);
@@ -244,6 +245,16 @@ export class GameManager extends Component {
           this.mode,
           this.latestSnapshot?.tanks.length ?? 0
         );
+
+        // Spawn protection indicator
+        if (this.latestSnapshot) {
+          const meSnap = this.latestSnapshot.tanks.find(
+            (t) => (t.playerId as string) === this.playerId,
+          );
+          this.hudController.setSpawnProtected(
+            (meSnap?.spawnProtectionMs ?? 0) > 0
+          );
+        }
 
         // Update Skill Cooldowns on HUD
         const ratioE = this.skillEMaxCooldownMs > 0 ? this.skillECooldownMs / this.skillEMaxCooldownMs : 0;
@@ -263,9 +274,17 @@ export class GameManager extends Component {
 
     // ── Minimap ────────────────────────────────────────────────
     if (this.minimapController) {
+      const myTeamForMinimap = this.latestSnapshot?.tanks.find(
+        (t) => (t.playerId as string) === this.playerId,
+      )?.team;
+
       this.minimapController.updateEntities(
         this.prediction.position,
-        remotes.map(e => ({ x: e.position.x, y: e.position.y, isAlly: false }))
+        remotes.map(e => ({
+          x: e.position.x,
+          y: e.position.y,
+          isAlly: myTeamForMinimap ? e.team === myTeamForMinimap : false,
+        }))
       );
     }
 
@@ -321,6 +340,8 @@ export class GameManager extends Component {
 
     const ms = snapshot.matchState;
     if (ms) {
+      const myTeam = me?.team as string | undefined;
+
       if (ms.phase === MatchPhase.WaitingForPlayers) {
         this.hudController?.setWaitingStatus(true);
         this.hudController?.hideMatchInfo();
@@ -333,14 +354,34 @@ export class GameManager extends Component {
         this.matchOverlay?.hideResults();
       } else if (ms.phase === MatchPhase.Playing) {
         this.hudController?.setWaitingStatus(false);
-        this.hudController?.updateMatchInfo(ms.matchTimeSec, ms.teamScores['Red'] ?? 0, ms.teamScores['Blue'] ?? 0);
+        this.hudController?.updateMatchInfo(
+          ms.matchTimeSec,
+          ms.matchTimeLimitSec,
+          ms.teamScores['Red'] ?? 0,
+          ms.teamScores['Blue'] ?? 0,
+          ms.killTarget,
+        );
         this.matchOverlay?.hideCountdown();
         this.matchOverlay?.hideResults();
       } else if (ms.phase === MatchPhase.MatchEnd) {
         this.hudController?.setWaitingStatus(false);
         this.hudController?.hideMatchInfo();
         this.matchOverlay?.hideCountdown();
-        this.matchOverlay?.showResults(ms.winnerId, ms.scores as any);
+
+        // Build rich score data
+        const richScores = (ms.scores as Array<any>).map((s: any) => ({
+          name: s.playerId ?? 'Player',
+          kills: s.kills ?? 0,
+          deaths: s.deaths ?? 0,
+          team: s.team as string,
+          tankId: s.tankId as string,
+        }));
+        this.matchOverlay?.showResults(
+          ms.winnerId,
+          richScores,
+          myTeam,
+          ms.matchTimeSec,
+        );
       }
     }
 
@@ -397,6 +438,7 @@ export class GameManager extends Component {
         isPlayer: false,
         isAlly,
         level: e.level,
+        spawnProtectionMs: e.spawnProtectionMs,
       });
     }
 

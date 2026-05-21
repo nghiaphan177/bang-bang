@@ -17,7 +17,7 @@
 | Phase 3: Networking | ✅ DONE | WebSocketServer, Room (60Hz), InputBuffer, ClientPrediction, EntityInterpolation |
 | Phase 4: Match Lifecycle | ✅ DONE | Waiting→Countdown→Playing→MatchEnd, kill/death tracking, 5s respawn |
 | Phase 5: Collision Map | ✅ DONE | Arctic map, box tiles, minimap |
-| Phase 6: Cocos Migration | 🔄 IN PROGRESS | **Current focus** — see task list below |
+| Phase 6: Cocos Migration | ✅ DONE | All client tasks complete — see task list below |
 | Phase 7: Skill Systems | ❌ NOT STARTED | Dash, Hitscan, Homing, Lob execution |
 | Phase 8: Evolution | ❌ NOT STARTED | EXP, levels, stat scaling |
 | Phase 9: Game Modes | ❌ NOT STARTED | TDM complete, Base Destroy, CTF |
@@ -472,7 +472,7 @@ SpiderMan's Web Prison (Space) uses `ProjectileArchetype.Lob`.
 ---
 
 #### Task 3.3 — Kill Feed UI
-- **Status:** `[ ]`
+- **Status:** `[x]`
 - **Deps:** None (independent)
 - **Priority:** 🟡 P2
 - **Effort:** Small (1-2 hours)
@@ -538,7 +538,7 @@ SpiderMan's Web Prison (Space) uses `ProjectileArchetype.Lob`.
 > All tasks in this stream are **independent** — can be done in any order, in parallel.
 
 #### Task 5.1 — Muzzle Flash VFX
-- **Status:** `[ ]`
+- **Status:** `[x]`
 - **Deps:** None
 - **Priority:** 🟢 P3
 - **Effort:** Small (30 min)
@@ -556,7 +556,7 @@ SpiderMan's Web Prison (Space) uses `ProjectileArchetype.Lob`.
 ---
 
 #### Task 5.2 — Projectile Hit Explosion VFX
-- **Status:** `[ ]`
+- **Status:** `[x]`
 - **Deps:** None
 - **Priority:** 🟢 P3
 - **Effort:** Small (30 min)
@@ -575,7 +575,7 @@ SpiderMan's Web Prison (Space) uses `ProjectileArchetype.Lob`.
 ---
 
 #### Task 5.3 — Damage Flash
-- **Status:** `[ ]`
+- **Status:** `[x]`
 - **Deps:** None
 - **Priority:** 🟢 P3
 - **Effort:** Small (30 min)
@@ -594,7 +594,7 @@ SpiderMan's Web Prison (Space) uses `ProjectileArchetype.Lob`.
 ---
 
 #### Task 5.4 — Screen Shake on Damage
-- **Status:** `[ ]`
+- **Status:** `[x]`
 - **Deps:** None
 - **Priority:** 🟢 P3
 - **Effort:** Small (20 min)
@@ -619,7 +619,7 @@ SpiderMan's Web Prison (Space) uses `ProjectileArchetype.Lob`.
 ---
 
 #### Task 5.5 — Death & Respawn Animations
-- **Status:** `[ ]`
+- **Status:** `[x]`
 - **Deps:** None
 - **Priority:** 🟢 P3
 - **Effort:** Small (30 min)
@@ -712,7 +712,7 @@ SpiderMan's Web Prison (Space) uses `ProjectileArchetype.Lob`.
 ### Work Stream 7: Tank Selection & Lobby
 
 #### Task 7.1 — Tank Selection UI
-- **Status:** `[ ]`
+- **Status:** `[x]`
 - **Deps:** None (independent but lower priority)
 - **Priority:** 🟢 P3
 - **Effort:** Medium (2-3 hours)
@@ -755,7 +755,7 @@ SpiderMan's Web Prison (Space) uses `ProjectileArchetype.Lob`.
 ---
 
 #### Task 8.2 — Server Smoke Test
-- **Status:** `[ ]`
+- **Status:** `[x]`
 - **Deps:** None
 - **Priority:** 🟢 P3
 - **Effort:** Small (1 hour)
@@ -843,3 +843,4 @@ AFTER 6.1:
 | 2026-05-21 | Claude Opus (initial audit) | Created implementation plan with 21 tasks across 8 work streams. Full codebase audit completed. |
 | 2026-05-21 | Antigravity | Completed Task 4.1 (Skill Cooldown UI) tracking client-side skill cooldowns and updating HUD bars/labels. |
 | 2026-05-21 | Antigravity | Completed Work Stream 6 (Evolution System). Implemented server-side EXP, stat scaling, hitbox growth, and client visual sync. |
+| 2026-05-21 | Antigravity | Completed remaining Phase 6 tasks: 3.3 (Kill Feed), 5.1-5.5 (VFX & Polish), 7.1 (Tank Selection), 8.2 (Smoke Test). Phase 6 fully complete. |

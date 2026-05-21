@@ -28,6 +28,7 @@ export interface InterpolatedEntity {
   tankId: string;
   team: string;
   level: number;
+  spawnProtectionMs: number;
 }
 
 export class EntityInterpolation {
@@ -122,6 +123,7 @@ export class EntityInterpolation {
         tankId: nextTank.tankId as string,
         team: nextTank.team as string,
         level: nextTank.level,
+        spawnProtectionMs: nextTank.spawnProtectionMs ?? 0,
       });
     }
 
@@ -148,6 +150,7 @@ export class EntityInterpolation {
       tankId: tank.tankId as string,
       team: tank.team as string,
       level: tank.level,
+      spawnProtectionMs: tank.spawnProtectionMs ?? 0,
     };
   }
 

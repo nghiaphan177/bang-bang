@@ -196,11 +196,19 @@ Final_DMG = max(1, floor(Raw_DMG * Mitigation))
 ### ✅ Phase 5: Minimap, Tank Size, Map Rework (COMPLETE)
 - Collision map system, box tiles, minimap
 
-### 🔄 Phase 6: Cocos Creator Migration (IN PROGRESS)
-- Migrating client from Phaser 3 to Cocos Creator 3.8 with 3D rendering
-- 3D cel-shaded tank models (Blender → .glb → Cocos)
-- Orthographic top-down camera
-- See `docs/ASSET_PIPELINE.md` for 3D asset workflow
+### ✅ Phase 6: Cocos Creator Migration (COMPLETE)
+- Full 3D cel-shaded client with orthographic camera
+- GameManager decomposition (SceneBuilder extracted)
+- HUD, MatchOverlay, Minimap, KillFeed all wired
+- Tank selection lobby with 4-tank roster
+- VFX: muzzle flash, hit explosions, damage flash, screen shake, death/respawn animations
+- Skill cooldown UI, team-aware coloring, match state handling
+- Server-side evolution system (EXP, level-up, stat scaling)
+
+### 🔄 Phase 7: Upcoming Work
+- **Next focus areas:** Game modes beyond TDM, PVE, Vision/Fog of War, Sound, Metagame
+- All skill systems (Dash, Hitscan, Homing, Lob) already implemented in Phase 6
+- Evolution system already implemented in Phase 6
 
 ---
 
@@ -208,11 +216,10 @@ Final_DMG = max(1, floor(Raw_DMG * Mitigation))
 
 | Priority | Feature | Notes |
 |----------|---------|-------|
-| **HIGH** | Cocos Creator client — full gameplay | Phase 6 in progress |
-| MEDIUM | Game modes (TDM, Base Destroy, CTF) | See GDD §7 |
+| **HIGH** | Game modes (TDM, Base Destroy, CTF) | See GDD §7 |
+| **HIGH** | Vision / Fog of War | Server-side culling per player |
 | MEDIUM | PVE mode (Co-op Dungeon) | See GDD §8 |
-| LOW | Vision / Fog of War | Server-side culling per player |
-| LOW | Sound effects | Cocos AudioSource component |
+| MEDIUM | Sound effects | Cocos AudioSource component |
 | LOW | Metagame / Garage | Out-match progression (see GDD §9) |
 
 ---

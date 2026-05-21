@@ -29,6 +29,38 @@ export class CollisionSystem {
       this.resolveTankMapCollision(tank, state);
       this.updateBushStealth(tank, state);
     }
+
+    // Tank-to-tank body blocking (circle-circle collision)
+    for (let i = 0; i < tanks.length; i++) {
+      const a = tanks[i]!;
+      for (let j = i + 1; j < tanks.length; j++) {
+        const b = tanks[j]!;
+        if (!a.transform || !b.transform || !a.collider || !b.collider) continue;
+        if (!a.health?.isAlive || !b.health?.isAlive) continue;
+
+        const dx = b.transform.position.x - a.transform.position.x;
+        const dy = b.transform.position.y - a.transform.position.y;
+        const distSq = dx * dx + dy * dy;
+        const minDist = a.collider.radius + b.collider.radius;
+
+        if (distSq >= minDist * minDist || distSq === 0) continue;
+
+        const dist = Math.sqrt(distSq);
+        const overlap = minDist - dist;
+        const nx = dx / dist;
+        const ny = dy / dist;
+        const halfPush = overlap / 2;
+
+        a.transform.position = {
+          x: a.transform.position.x - nx * halfPush,
+          y: a.transform.position.y - ny * halfPush,
+        };
+        b.transform.position = {
+          x: b.transform.position.x + nx * halfPush,
+          y: b.transform.position.y + ny * halfPush,
+        };
+      }
+    }
   }
 
   /**

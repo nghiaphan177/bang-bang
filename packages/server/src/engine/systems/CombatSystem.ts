@@ -72,6 +72,9 @@ export class CombatSystem {
       ) ?? false;
       if (isInvuln) continue;
 
+      // Check spawn protection (3s invulnerability on respawn)
+      if (target.spawnProtectionMs != null && target.spawnProtectionMs > 0) continue;
+
       const actualDamage = this.calculateDamage(
         hit.damage,
         hit.damageChannel,
