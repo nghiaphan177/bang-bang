@@ -141,7 +141,7 @@ export class GameWebSocketServer {
       return;
     }
 
-    const entityId = room.addPlayer(msg.playerId, msg.tankId, ws);
+    const entityId = room.addPlayer(msg.playerId, msg.tankId, ws, msg.playerName);
     if (!entityId) {
       this.sendError(ws, 'JOIN_FAILED', 'Failed to join room');
       return;
