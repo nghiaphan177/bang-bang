@@ -78,9 +78,6 @@ bang-bang/
 │   │   │       └── InputBuffer.ts      # Per-player latest input storage
 │   │   └── package.json           # deps: ws, tsx
 │   │
-│   ├── client/                    # LEGACY — Old Phaser 3 client (kept for reference)
-│   │   └── ...                    # Do NOT modify — preserved as migration reference
-│   │
 │   └── client-cocos/              # @bang-bang/client-cocos — Cocos Creator 3.8 (3D)
 │       ├── assets/                # Cocos asset directory
 │       │   ├── scenes/            # Boot.scene, Game.scene, Lobby.scene
@@ -178,12 +175,12 @@ Final_DMG = max(1, floor(Raw_DMG * Mitigation))
 ## 4. CURRENT STATE (What's Built)
 
 ### ✅ Phase 1: Foundation (COMPLETE)
-- Monorepo with workspaces: shared, server, client
+- Monorepo with workspaces: shared, server
 - TypeScript strict config with brand types
 - All 11 shared type files
 
-### ✅ Phase 2: Local Prototype (COMPLETE — Phaser, Legacy)
-- Phaser 3 client with Vite bundler (preserved in `packages/client/`)
+### ✅ Phase 2: Local Prototype (COMPLETE — Phaser, Legacy, Deleted)
+- Phaser 3 client with Vite bundler (previously in `packages/client/`, now deleted)
 - Local game simulation (`LocalGameState.ts`)
 - All renderers (Map, Tank, Projectile, HUD, Dummy)
 
@@ -271,8 +268,6 @@ npx tsx packages/server/src/main.ts
 pip install rembg
 python tools/asset-gen/process_assets.py --input raw.png --output clean.png
 
-# Legacy Phaser client (preserved for reference)
-cd packages/client && npm run dev
 ```
 
 ---
@@ -295,7 +290,6 @@ cd packages/client && npm run dev
 14. **Cocos Creator 3D mode:** All game objects are 3D nodes. Camera is orthographic top-down. Use `cc` module for Cocos APIs.
 15. **3D Tank prefab hierarchy:** TankRoot → HullMesh + TurretPivot → TurretMesh. Rotation via `Quat.fromEuler()`.
 16. **UI uses Cocos UI system:** `Canvas`, `Label`, `Sprite`, `ProgressBar`, `Layout`. NOT DOM/HTML.
-17. **Do NOT modify `packages/client/`** — it is the legacy Phaser client kept for reference only.
 
 ---
 
@@ -306,7 +300,6 @@ cd packages/client && npm run dev
 | [GDD.md](GDD.md) | Game Design Document | Full gameplay rules, modes, mechanics, boss fights, metagame |
 | [ASSET_PIPELINE.md](ASSET_PIPELINE.md) | Art pipeline | 3D modeling workflow, Blender→Cocos, cel-shaded materials, map rendering |
 | [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md) | **Task tracker** | Detailed task breakdown, status, dependencies — pick up your next task here |
-| [MIGRATE_COCOS.md](MIGRATE_COCOS.md) | Migration plan | Original Phaser→Cocos migration design (mostly complete) |
 | [AGENT_CONTEXT.md](AGENT_CONTEXT.md) | **This file** | Architecture, current state, rules for agents |
 
 > **Starting a new session?** After reading this file, check [IMPLEMENTATION_PLAN.md](IMPLEMENTATION_PLAN.md) for the current task list. Find the first `[ ]` task whose dependencies are all `[x]`, do that task, mark it `[x]`, and commit.

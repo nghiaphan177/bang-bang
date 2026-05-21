@@ -29,7 +29,6 @@ bang-bang/
 ├── packages/
 │   ├── shared/                     # @bang-bang/shared — TypeScript types & environment schemas
 │   ├── server/                     # @bang-bang/server — 60Hz WebSocket authoritative game server
-│   ├── client/                     # LEGACY — Old Phaser 3 client (preserved for reference)
 │   └── client-cocos/               # @bang-bang/client-cocos — Cocos Creator 3.8 (3D)
 ├── tools/
 │   ├── asset-gen/                  # Asset processing scripts (rembg background removal)
@@ -66,13 +65,6 @@ npx tsx packages/server/src/main.ts
 3. In Dashboard → **Add Project** → Select `packages/client-cocos/`
 4. Click **Open** to launch in Cocos Creator Editor
 5. Press the **Play** button (▶) to preview in browser
-
-### 5. Legacy Phaser Client (Reference Only)
-The old Phaser 3 client is preserved in `packages/client/`:
-```bash
-cd packages/client
-npm run dev   # Opens at http://localhost:5173
-```
 
 ---
 

@@ -8,7 +8,6 @@ All production code must be under `packages/`:
 - `packages/shared` — cross-module domain primitives, types, and environment schemas
 - `packages/server` — 60Hz WebSocket authoritative game server
 - `packages/client-cocos` — Cocos Creator 3.8 client (3D mode, primary)
-- `packages/client` — LEGACY Phaser 3 client (preserved for reference, do NOT modify)
 
 Documentation and tooling:
 - `docs/` — Design & developer specifications (AGENT_CONTEXT.md, GDD.md, ASSET_PIPELINE.md)
@@ -49,4 +48,3 @@ Cocos Creator 3.8 client with 3D rendering:
 - If code is server-side game logic or netcode, it goes to `packages/server`.
 - If code is a Cocos component/rendering/UI, it goes to `packages/client-cocos/assets/scripts/`.
 - 3D models (.blend) go to `tools/blender/`, exported .glb go to `packages/client-cocos/assets/models/`.
-- Do NOT modify `packages/client/` — it is the legacy Phaser client for reference only.

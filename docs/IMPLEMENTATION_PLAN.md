@@ -13,7 +13,7 @@
 | Phase | Status | Description |
 |-------|--------|-------------|
 | Phase 1: Foundation | ✅ DONE | Monorepo, shared types (11 files), TypeScript strict |
-| Phase 2: Local Prototype | ✅ DONE | Phaser 3 client (legacy, in `packages/client/`) |
+| Phase 2: Local Prototype | ✅ DONE | Phaser 3 client (legacy, previously in `packages/client/`, now deleted) |
 | Phase 3: Networking | ✅ DONE | WebSocketServer, Room (60Hz), InputBuffer, ClientPrediction, EntityInterpolation |
 | Phase 4: Match Lifecycle | ✅ DONE | Waiting→Countdown→Playing→MatchEnd, kill/death tracking, 5s respawn |
 | Phase 5: Collision Map | ✅ DONE | Arctic map, box tiles, minimap |
@@ -495,7 +495,7 @@ SpiderMan's Web Prison (Space) uses `ProjectileArchetype.Lob`.
 ### Work Stream 4: Client — Skill Cooldown UI
 
 #### Task 4.1 — Skill Cooldown Display
-- **Status:** `[ ]`
+- **Status:** `[x]`
 - **Deps:** Task 1.2
 - **Priority:** 🟡 P2
 - **Effort:** Medium (2 hours)
@@ -644,7 +644,7 @@ SpiderMan's Web Prison (Space) uses `ProjectileArchetype.Lob`.
 ### Work Stream 6: Server — Evolution System
 
 #### Task 6.1 — Add EXP Tracking Component
-- **Status:** `[ ]`
+- **Status:** `[x]`
 - **Deps:** None
 - **Priority:** 🟡 P2
 - **Effort:** Small (30 min)
@@ -670,7 +670,7 @@ SpiderMan's Web Prison (Space) uses `ProjectileArchetype.Lob`.
 ---
 
 #### Task 6.2 — Create EvolutionSystem
-- **Status:** `[ ]`
+- **Status:** `[x]`
 - **Deps:** Task 6.1
 - **Priority:** 🟡 P2
 - **Effort:** Medium (2 hours)
@@ -833,7 +833,6 @@ AFTER 6.1:
 13. **Cocos 3D mode:** orthographic camera, 3D nodes, `cc` module
 14. **3D Tank hierarchy:** TankRoot → HullMesh + TurretPivot → TurretMesh
 15. **UI uses Cocos UI:** Canvas, Label, Sprite, ProgressBar. NOT DOM/HTML
-16. **Do NOT modify `packages/client/`** — legacy Phaser client
 
 ---
 
@@ -842,3 +841,5 @@ AFTER 6.1:
 | Date | Agent | Changes |
 |------|-------|---------|
 | 2026-05-21 | Claude Opus (initial audit) | Created implementation plan with 21 tasks across 8 work streams. Full codebase audit completed. |
+| 2026-05-21 | Antigravity | Completed Task 4.1 (Skill Cooldown UI) tracking client-side skill cooldowns and updating HUD bars/labels. |
+| 2026-05-21 | Antigravity | Completed Work Stream 6 (Evolution System). Implemented server-side EXP, stat scaling, hitbox growth, and client visual sync. |

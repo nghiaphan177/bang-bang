@@ -44,8 +44,6 @@ Only these paths are staged:
    git add packages/ docs/ tools/ package.json package-lock.json tsconfig.base.json
    ```
 
-   > Note: `packages/client/` is legacy Phaser — it will be staged if modified but should NOT be modified.
-
 // turbo
 6. Show what will be committed:
    ```bash
