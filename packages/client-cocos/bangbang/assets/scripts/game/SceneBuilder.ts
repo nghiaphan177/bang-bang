@@ -56,7 +56,7 @@ export class SceneBuilder {
     cam.orthoHeight = 360;
     cam.near = 1;
     cam.far = 2000;
-    cam.visibility = 0xffffffff & ~Layers.Enum.UI_2D;
+    cam.visibility = 0xffffffff & ~Layers.BitMask.UI_2D;
 
     // ── Directional Light ──────────────────────────────────────
     const lightNode = new Node('DirLight');
@@ -127,7 +127,7 @@ export class SceneBuilder {
     const uiCamera = uiCameraNode.addComponent(Camera);
     uiCamera.projection = 1; // ORTHO
     uiCamera.priority = 1;
-    uiCamera.visibility = Layers.Enum.UI_2D;
+    uiCamera.visibility = Layers.BitMask.UI_2D;
     uiCamera.clearFlags = 2; // DEPTH_ONLY
     canvas.cameraComponent = uiCamera;
 
