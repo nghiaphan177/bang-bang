@@ -20,6 +20,7 @@ import { MatchOverlayController } from '../ui/MatchOverlayController';
 import { MinimapController } from '../ui/MinimapController';
 import type { GameSnapshot, PlayerInput } from '../shared/types/network';
 import type { Radians } from '../shared/types/core';
+import { MatchPhase } from '../shared/types/state-machine';
 import { SceneBuilder, TILE_PX } from './SceneBuilder';
 
 const { ccclass } = _decorator;
@@ -115,7 +116,11 @@ export class GameManager extends Component {
       this.prediction.position.y * TILE_PX,
     );
 
-    const inp = this.inputManager.getInput();
+    const isMatchEnd = this.latestSnapshot?.matchState.phase === MatchPhase.MatchEnd;
+    const rawInput = this.inputManager.getInput();
+    const inp = isMatchEnd
+      ? { moveDir: null, aimAngle: 0, fire: false, skillE: false, skillSpace: false }
+      : rawInput;
 
     const playerInput: PlayerInput = {
       moveDir: inp.moveDir,
@@ -130,11 +135,11 @@ export class GameManager extends Component {
 
     if (this.mode === 'online' && this.networkClient) {
       this.networkClient.sendInput({
-        moveDir: inp.moveDir,
-        aimAngle: inp.aimAngle as Radians,
-        fire: inp.fire,
-        skillE: inp.skillE,
-        skillSpace: inp.skillSpace,
+        moveDir: playerInput.moveDir,
+        aimAngle: playerInput.aimAngle,
+        fire: playerInput.fire,
+        skillE: playerInput.skillE,
+        skillSpace: playerInput.skillSpace,
       });
     }
 
@@ -206,20 +211,26 @@ export class GameManager extends Component {
 
     const ms = snapshot.matchState;
     if (ms) {
-      if (ms.phase === 'Countdown') {
-        this.matchOverlay?.showCountdown(ms.countdownSec);
-      } else {
+      if (ms.phase === MatchPhase.WaitingForPlayers) {
+        this.hudController?.setWaitingStatus(true);
+        this.hudController?.hideMatchInfo();
         this.matchOverlay?.hideCountdown();
-      }
-
-      if (ms.phase === 'Playing') {
-        this.hudController?.updateMatchInfo(ms.matchTimeSec, ms.teamScores['Red'] ?? 0, ms.teamScores['Blue'] ?? 0);
-      }
-
-      if (ms.phase === 'MatchEnd') {
-        this.matchOverlay?.showResults(ms.winnerId, ms.scores as any);
-      } else {
         this.matchOverlay?.hideResults();
+      } else if (ms.phase === MatchPhase.Countdown) {
+        this.hudController?.setWaitingStatus(false);
+        this.hudController?.hideMatchInfo();
+        this.matchOverlay?.showCountdown(ms.countdownSec);
+        this.matchOverlay?.hideResults();
+      } else if (ms.phase === MatchPhase.Playing) {
+        this.hudController?.setWaitingStatus(false);
+        this.hudController?.updateMatchInfo(ms.matchTimeSec, ms.teamScores['Red'] ?? 0, ms.teamScores['Blue'] ?? 0);
+        this.matchOverlay?.hideCountdown();
+        this.matchOverlay?.hideResults();
+      } else if (ms.phase === MatchPhase.MatchEnd) {
+        this.hudController?.setWaitingStatus(false);
+        this.hudController?.hideMatchInfo();
+        this.matchOverlay?.hideCountdown();
+        this.matchOverlay?.showResults(ms.winnerId, ms.scores as any);
       }
     }
 

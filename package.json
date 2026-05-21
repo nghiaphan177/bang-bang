@@ -11,7 +11,8 @@
     "check:types": "tsc --project packages/shared/tsconfig.json --noEmit",
     "check:shared": "tsc --project packages/shared/tsconfig.json --noEmit",
     "check:server": "tsc --project packages/server/tsconfig.json --noEmit",
-    "check:all": "npm run build:shared && npm run check:server"
+    "check:all": "npm run build:shared && npm run check:server",
+    "test:server": "npm --prefix packages/server run test"
   },
   "devDependencies": {
     "typescript": "^5.8.0"

@@ -9,7 +9,6 @@ import type WebSocket from 'ws';
 import {
   type PlayerId,
   type EntityId,
-  type TankId,
   type Milliseconds,
   type GridUnits,
   type GameMap,
@@ -28,6 +27,7 @@ import {
   type GameSnapshot,
   type MatchEndMessage,
   TeamId,
+  TankId,
   loadCollisionMap,
   ARCTIC_COLLISION,
 } from '@bang-bang/shared';
@@ -39,6 +39,8 @@ import { CollisionSystem } from '../engine/systems/CollisionSystem';
 import { ProjectileSystem } from '../engine/systems/ProjectileSystem';
 import { CombatSystem } from '../engine/systems/CombatSystem';
 import { StatusEffectSystem } from '../engine/systems/StatusEffectSystem';
+import { DashSystem } from '../engine/systems/DashSystem';
+import { HitscanSystem } from '../engine/systems/HitscanSystem';
 import { TANK_ROSTER } from '../data/tank-roster';
 import { InputBuffer } from './InputBuffer';
 
@@ -84,6 +86,8 @@ export class Room {
   private readonly projectileSystem = new ProjectileSystem();
   private readonly combatSystem = new CombatSystem();
   private readonly statusEffectSystem = new StatusEffectSystem();
+  private readonly dashSystem = new DashSystem();
+  private readonly hitscanSystem = new HitscanSystem();
 
   private tickInterval: ReturnType<typeof setInterval> | null = null;
   private lastTickTime: number = 0;
@@ -316,16 +320,31 @@ export class Room {
     // 1. Apply buffered inputs
     this.applyInputs();
 
+    // 1.3 Process skill activations
+    this.processSkillActivations(dt);
+
     // 1.5 Spawn projectiles for tanks that are firing
     this.spawnProjectilesForFiringTanks(dt);
 
     // 2. Run game systems
     const em = this.gameState.entityManager;
     this.statusEffectSystem.update(em, dt);
+    
+    // Update dashes and cast/hitscans
+    this.dashSystem.update(em, this.gameState, this.collisionSystem, this.combatSystem, dt);
+    this.hitscanSystem.update(em, this.gameState, this.combatSystem, dt);
+
     this.movementSystem.update(em, dt);
     this.collisionSystem.update(em, this.gameState, dt);
     this.projectileSystem.update(em, this.gameState, dt);
     this.combatSystem.update(em, this.gameState, dt);
+
+    // Tick down player stealth window
+    for (const tank of em.getTanks()) {
+      if (tank.tankState?.stealthRemainingMs && tank.tankState.stealthRemainingMs > 0) {
+        tank.tankState.stealthRemainingMs = Math.max(0, tank.tankState.stealthRemainingMs - dt);
+      }
+    }
 
     // 3. Process kills and deaths
     this.processDeaths();
@@ -699,8 +718,19 @@ export class Room {
     );
 
     for (const player of this.players.values()) {
+      // Filter tanks: hide enemies that have stealthRemainingMs > 0
+      const filteredTanks = snapshot.tanks.filter(t => {
+        const entity = this.gameState.entityManager.get(t.entityId);
+        if (entity?.tankState?.stealthRemainingMs && entity.tankState.stealthRemainingMs > 0) {
+          // If stealth is active, only show to same team
+          return t.team === player.team;
+        }
+        return true;
+      });
+
       const playerSnapshot: GameSnapshot = {
         ...snapshot,
+        tanks: filteredTanks,
         lastProcessedInput: this.inputBuffer.getLastProcessedSeq(player.playerId),
       };
 
@@ -753,6 +783,305 @@ export class Room {
       });
     }
     return scores;
+  }
+
+  private processSkillActivations(dt: number): void {
+    const em = this.gameState.entityManager;
+    for (const tank of em.getTanks()) {
+      if (!tank.health?.isAlive || !tank.input || !tank.cooldowns || !tank.tankIdentity || !tank.transform || !tank.turret) continue;
+
+      // If stunned or dead, cannot activate skills
+      if (tank.tankState?.current === TankState.Stunned || tank.tankState?.current === TankState.Dead) continue;
+
+      // Handle Skill E
+      if (tank.input.skillE && tank.cooldowns.skillE.isReady) {
+        const def = TANK_ROSTER[tank.tankIdentity.tankId];
+        if (def && def.skillE) {
+          const activated = this.activateSkill(tank, 'E', def.skillE);
+          if (activated) {
+            tank.cooldowns.skillE.remainingMs = def.skillE.cooldownSec * 1000;
+            tank.cooldowns.skillE.isReady = false;
+          }
+        }
+      }
+
+      // Handle Skill Space
+      if (tank.input.skillSpace && tank.cooldowns.skillSpace.isReady) {
+        const def = TANK_ROSTER[tank.tankIdentity.tankId];
+        if (def && def.skillSpace) {
+          const activated = this.activateSkill(tank, 'Space', def.skillSpace);
+          if (activated) {
+            tank.cooldowns.skillSpace.remainingMs = def.skillSpace.cooldownSec * 1000;
+            tank.cooldowns.skillSpace.isReady = false;
+          }
+        }
+      }
+    }
+  }
+
+  private activateSkill(tank: GameEntity, slot: 'E' | 'Space', skillDef: any): boolean {
+    const em = this.gameState.entityManager;
+
+    switch (skillDef.archetype) {
+      case ProjectileArchetype.Homing: {
+        // Iron Man E - Micro-Missiles
+        const rangeGrids = (skillDef.range ?? 320) / 32;
+        let targetEnemy: GameEntity | null = null;
+        let minDist = rangeGrids;
+
+        for (const other of em.getTanks()) {
+          if (!other.health?.isAlive || other.id === tank.id) continue;
+          if (other.tankIdentity?.team === tank.tankIdentity?.team) continue; // Skip allies
+
+          const dx = other.transform!.position.x - tank.transform!.position.x;
+          const dy = other.transform!.position.y - tank.transform!.position.y;
+          const dist = Math.sqrt(dx * dx + dy * dy);
+          if (dist < minDist) {
+            minDist = dist;
+            targetEnemy = other;
+          }
+        }
+
+        const rawDamage = skillDef.damageFormula.baseDamage + (tank.combatStats!.atk * skillDef.damageFormula.atkScaling);
+        const angles = [-Math.PI / 12, 0, Math.PI / 12];
+        const spawnDist = 0.7;
+        const speed = 15;
+        const maxRange = rangeGrids;
+
+        for (const spread of angles) {
+          const angle = (tank.turret!.aimAngle as number) + spread;
+          const proj = em.create('projectile');
+
+          proj.transform = {
+            position: {
+              x: tank.transform!.position.x + Math.cos(angle) * spawnDist,
+              y: tank.transform!.position.y + Math.sin(angle) * spawnDist,
+            },
+            rotation: angle as any,
+          };
+
+          proj.velocity = {
+            velocity: {
+              x: Math.cos(angle) * speed,
+              y: Math.sin(angle) * speed,
+            },
+            speed,
+          };
+
+          proj.projectile = {
+            archetype: ProjectileArchetype.Homing,
+            ownerId: tank.id,
+            tankId: tank.tankIdentity!.tankId,
+            damage: rawDamage,
+            damageChannel: skillDef.damageFormula.channel,
+            maxRange,
+            distanceTraveled: 0,
+            phase: ProjectilePhase.Active,
+            targetEntityId: targetEnemy ? targetEnemy.id : undefined,
+            turnRate: Math.PI * 2, // 360 degrees per second
+          };
+        }
+        return true;
+      }
+
+      case ProjectileArchetype.Lob: {
+        // SpiderMan Space - Web Prison
+        const rangeGrids = (skillDef.range ?? 352) / 32;
+        const aimAngle = tank.turret!.aimAngle as number;
+        const targetX = tank.transform!.position.x + Math.cos(aimAngle) * rangeGrids;
+        const targetY = tank.transform!.position.y + Math.sin(aimAngle) * rangeGrids;
+
+        const rawDamage = skillDef.damageFormula.baseDamage + (tank.combatStats!.atk * skillDef.damageFormula.atkScaling);
+        const airTime = skillDef.airTime ?? 1.0; // 1s air time
+        const airTimeMs = airTime * 1000;
+
+        // Calculate visual flight speed so it arrives at targetPosition in airTime
+        const dx = targetX - tank.transform!.position.x;
+        const dy = targetY - tank.transform!.position.y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        const speed = airTime > 0 ? dist / airTime : 10;
+
+        const proj = em.create('projectile');
+        proj.transform = {
+          position: { x: tank.transform!.position.x, y: tank.transform!.position.y },
+          rotation: aimAngle as any,
+        };
+
+        proj.velocity = {
+          velocity: {
+            x: Math.cos(aimAngle) * speed,
+            y: Math.sin(aimAngle) * speed,
+          },
+          speed,
+        };
+
+        proj.projectile = {
+          archetype: ProjectileArchetype.Lob,
+          ownerId: tank.id,
+          tankId: tank.tankIdentity!.tankId,
+          damage: rawDamage,
+          damageChannel: skillDef.damageFormula.channel,
+          maxRange: dist,
+          distanceTraveled: 0,
+          phase: ProjectilePhase.Active,
+          targetPosition: { x: targetX, y: targetY },
+          airTimeMs,
+          airTimeRemainingMs: airTimeMs,
+          aoeRadius: 3.0, // 3 grids AoE
+          aoeEffects: [...(skillDef.effects ?? [])],
+        };
+        return true;
+      }
+
+      case ProjectileArchetype.Dash: {
+        if (slot === 'E' && tank.tankIdentity!.tankId === TankId.Naruto) {
+          // Naruto Shadow Clone (E)
+          // 1. Spawn decoy clone at player's current position
+          const clone = em.create('tank');
+          clone.transform = {
+            position: { x: tank.transform!.position.x, y: tank.transform!.position.y },
+            rotation: tank.transform!.rotation,
+          };
+          clone.velocity = { velocity: { x: 0, y: 0 }, speed: 0 };
+          clone.tankIdentity = {
+            tankId: tank.tankIdentity!.tankId,
+            playerId: `clone_${tank.id}_${Date.now()}` as any,
+            team: tank.tankIdentity!.team,
+            hover: tank.tankIdentity!.hover,
+            hitboxRadius: tank.tankIdentity!.hitboxRadius,
+          };
+          clone.health = { hp: 1, maxHp: 1, isAlive: true };
+          clone.tankState = {
+            current: TankState.Moving,
+            enteredAt: Date.now() as any,
+            durationMs: 3000 as any, // 3s
+          };
+          clone.turret = {
+            aimAngle: tank.turret!.aimAngle,
+            rotationSpeed: tank.turret!.rotationSpeed,
+          };
+          clone.collider = { radius: tank.collider!.radius, isStatic: false };
+          clone.statusEffects = { effects: [] };
+          clone.combatStats = {
+            atk: 0,
+            range: 0,
+            defP: 0,
+            defE: 0,
+            attackSpeed: 0,
+            speed: 0 as any,
+          };
+
+          // 2. Teleport real player a short distance backward (opposite of aim angle)
+          const oppositeAngle = (tank.turret!.aimAngle as number) + Math.PI;
+          const teleportDist = 2.5; // 2.5 grids
+          tank.transform!.position = {
+            x: tank.transform!.position.x + Math.cos(oppositeAngle) * teleportDist,
+            y: tank.transform!.position.y + Math.sin(oppositeAngle) * teleportDist,
+          };
+          this.collisionSystem.resolveTankMapCollision(tank, this.gameState);
+
+          // 3. Apply stealth window (0.5s)
+          tank.tankState!.stealthRemainingMs = 500;
+          return true;
+        } else if (slot === 'Space' && tank.tankIdentity!.tankId === TankId.Naruto) {
+          // Naruto Rasengan (Space) - Dash forward in turret aim angle for 0.4s at 3x speed
+          const aimAngle = tank.turret!.aimAngle as number;
+          this.triggerDash(tank, skillDef, aimAngle, 3.0, 400, 'rasengan');
+          return true;
+        } else if (slot === 'E' && tank.tankIdentity!.tankId === TankId.ThanhGiong) {
+          // ThanhGiong Charge (E) - Dash forward in hull rotation for 0.5s at 2.5x speed
+          const hullAngle = tank.transform!.rotation as number;
+          this.triggerDash(tank, skillDef, hullAngle, 2.5, 500, 'charge');
+          return true;
+        }
+        return false;
+      }
+
+      case ProjectileArchetype.Hitscan: {
+        if (skillDef.castTimeSec && skillDef.castTimeSec > 0) {
+          tank.tankState!.current = TankState.Casting;
+          tank.tankState!.enteredAt = Date.now() as any;
+          tank.castState = {
+            isCasting: true,
+            skillSlot: slot,
+            remainingMs: skillDef.castTimeSec * 1000,
+            rootSelf: skillDef.rootSelfDuringCast ?? false,
+            skillDef,
+          };
+        } else {
+          // Instant execution
+          this.hitscanSystem.executeHitscanSkill(tank, skillDef, em, this.combatSystem);
+        }
+        return true;
+      }
+
+      case ProjectileArchetype.Linear: {
+        // SpiderMan Web Pull (E) is ProjectileArchetype.Linear but behaves as a projectile skill!
+        const rangeGrids = (skillDef.range ?? 320) / 32;
+        const aimAngle = tank.turret!.aimAngle as number;
+        const rawDamage = skillDef.damageFormula.baseDamage + (tank.combatStats!.atk * skillDef.damageFormula.atkScaling);
+        const speed = skillDef.projectileSpeed ?? tank.combatStats!.speed * 2;
+
+        const proj = em.create('projectile');
+        const spawnDist = 0.7;
+
+        proj.transform = {
+          position: {
+            x: tank.transform!.position.x + Math.cos(aimAngle) * spawnDist,
+            y: tank.transform!.position.y + Math.sin(aimAngle) * spawnDist,
+          },
+          rotation: aimAngle as any,
+        };
+
+        proj.velocity = {
+          velocity: {
+            x: Math.cos(aimAngle) * speed,
+            y: Math.sin(aimAngle) * speed,
+          },
+          speed,
+        };
+
+        proj.projectile = {
+          archetype: ProjectileArchetype.Linear,
+          ownerId: tank.id,
+          tankId: tank.tankIdentity!.tankId,
+          damage: rawDamage,
+          damageChannel: skillDef.damageFormula.channel,
+          maxRange: rangeGrids,
+          distanceTraveled: 0,
+          phase: ProjectilePhase.Active,
+          effects: [...(skillDef.effects ?? [])],
+        };
+        return true;
+      }
+    }
+    return false;
+  }
+
+  private triggerDash(
+    tank: GameEntity,
+    skillDef: any,
+    directionAngle: number,
+    speedMultiplier: number,
+    durationMs: number,
+    dashType: 'rasengan' | 'charge'
+  ): void {
+    const rawDamage = skillDef.damageFormula.baseDamage + (tank.combatStats!.atk * skillDef.damageFormula.atkScaling);
+
+    tank.tankState!.current = TankState.Dashing;
+    tank.tankState!.enteredAt = Date.now() as any;
+
+    tank.dashState = {
+      isDashing: true,
+      direction: { x: Math.cos(directionAngle), y: Math.sin(directionAngle) },
+      speed: tank.combatStats!.speed * speedMultiplier,
+      remainingMs: durationMs,
+      dashType,
+      damagePayload: rawDamage,
+      damageChannel: skillDef.damageFormula.channel,
+      onHitEffects: [...(skillDef.effects ?? [])],
+      hitEntities: new Set(),
+    };
   }
 
   private sendToPlayer(player: RoomPlayer, msg: ServerMessage): void {

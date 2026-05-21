@@ -151,6 +151,15 @@ export class SceneBuilder {
     hudController.playerCountLabel = this.createLabelNode('PlayerCountLabel', hudNode, 400, 240);
     hudController.matchTimerLabel = this.createLabelNode('MatchTimerLabel', hudNode, 0, 300);
     hudController.scoreLabel = this.createLabelNode('ScoreLabel', hudNode, 0, 270);
+    
+    const waitingLabelNode = new Node('WaitingLabel');
+    waitingLabelNode.layer = Layers.Enum.UI_2D;
+    hudNode.addChild(waitingLabelNode);
+    waitingLabelNode.setPosition(0, 0, 0);
+    hudController.waitingLabel = waitingLabelNode.addComponent(Label);
+    hudController.waitingLabel.string = 'Waiting for players...';
+    hudController.waitingLabel.fontSize = 24;
+    hudController.waitingLabel.node.active = false;
 
     // MatchOverlay
     const matchOverlayNode = new Node('MatchOverlay');

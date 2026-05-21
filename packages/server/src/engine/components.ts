@@ -10,12 +10,20 @@ import {
   type Radians,
   type Milliseconds,
 } from '@bang-bang/shared';
-import { type TankId } from '@bang-bang/shared';
-import { TankState, ProjectilePhase } from '@bang-bang/shared';
-import { type StatusEffectType } from '@bang-bang/shared';
-import { ProjectileArchetype, DamageChannel, SkillSlot } from '@bang-bang/shared';
-import { type TileType, type BushVisibilityState } from '@bang-bang/shared';
-import { type TeamId } from '@bang-bang/shared';
+import {
+  type TankId,
+  TankState,
+  ProjectilePhase,
+  type StatusEffectType,
+  ProjectileArchetype,
+  DamageChannel,
+  SkillSlot,
+  type TileType,
+  type BushVisibilityState,
+  type TeamId,
+  type SkillEffect,
+  type SkillDefinition,
+} from '@bang-bang/shared';
 
 // ─── Transform ──────────────────────────────────────────────────────
 
@@ -55,6 +63,7 @@ export interface TankStateComponent {
   current: TankState;
   enteredAt: Milliseconds;
   durationMs: Milliseconds;
+  stealthRemainingMs?: number;
 }
 
 // ─── Turret ─────────────────────────────────────────────────────────
@@ -104,6 +113,30 @@ export interface StatusEffectsComponent {
   effects: ActiveStatusEffect[];
 }
 
+// ─── Dash State ─────────────────────────────────────────────────────
+
+export interface DashStateComponent {
+  isDashing: boolean;
+  direction: Vector2;
+  speed: number;
+  remainingMs: number;
+  dashType: 'rasengan' | 'charge' | 'clone';
+  damagePayload?: number | undefined;
+  damageChannel?: DamageChannel | undefined;
+  onHitEffects?: SkillEffect[] | undefined;
+  hitEntities: Set<string>; // prevent multi-hit
+}
+
+// ─── Cast State ─────────────────────────────────────────────────────
+
+export interface CastStateComponent {
+  isCasting: boolean;
+  skillSlot: 'E' | 'Space';
+  remainingMs: number;
+  rootSelf: boolean;
+  skillDef: SkillDefinition;
+}
+
 // ─── Projectile ─────────────────────────────────────────────────────
 
 export interface ProjectileComponent {
@@ -121,6 +154,20 @@ export interface ProjectileComponent {
   /** For boomerang-type: origin position to return to */
   originPosition?: Vector2;
   returnDamageMultiplier?: number;
+  
+  // For homing projectiles
+  targetEntityId?: EntityId | undefined;
+  turnRate?: number | undefined;
+  
+  // For lob projectiles
+  targetPosition?: Vector2 | undefined;
+  airTimeMs?: number | undefined;
+  airTimeRemainingMs?: number | undefined;
+  aoeRadius?: number | undefined;
+  aoeEffects?: SkillEffect[] | undefined;
+
+  // For linear/bouncing projectile status effects
+  effects?: SkillEffect[] | undefined;
 }
 
 // ─── Combat Stats (computed from base + tier + hardware) ────────────
@@ -177,4 +224,6 @@ export interface GameEntity {
   combatStats?: CombatStatsComponent;
   input?: InputComponent;
   collider?: ColliderComponent;
+  dashState?: DashStateComponent;
+  castState?: CastStateComponent;
 }

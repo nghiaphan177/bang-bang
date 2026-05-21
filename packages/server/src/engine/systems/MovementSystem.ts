@@ -48,6 +48,13 @@ export class MovementSystem {
       return;
     }
 
+    // Check if casting roots the tank
+    if (tankState.current === TankState.Casting && tank.castState?.rootSelf) {
+      velocity.velocity = { x: 0, y: 0 };
+      velocity.speed = 0;
+      return;
+    }
+
     // Check if Root status effect blocks movement
     const isRooted = tank.statusEffects?.effects.some(
       e => e.type === StatusEffectType.Root

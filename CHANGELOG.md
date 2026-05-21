@@ -9,3 +9,4 @@
 - **Client**: Added 100 HP divider lines to the 3D HP bar, configured to automatically hide when a tank's max HP is greater than 10,000 HP.
 - **Build**: Implemented root CI scripts (Task 8.1) to typecheck both `shared` and `server` packages with `npm run check:all`.
 - **Build**: Fixed TypeScript compilation issues in the Cocos Creator client copy of the shared package by re-exporting core type declarations from `network.ts`.
+- **Client**: Handled match phases in `GameManager` (Task 3.1). Added support for displaying "Waiting for players..." state, hiding match info when not playing, and disabling player input during the `MatchEnd` phase.

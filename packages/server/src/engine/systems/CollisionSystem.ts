@@ -34,7 +34,7 @@ export class CollisionSystem {
   /**
    * Circle-based collision: prevent tanks from overlapping blocking tiles.
    */
-  private resolveTankMapCollision(tank: GameEntity, state: GameState): void {
+  public resolveTankMapCollision(tank: GameEntity, state: GameState): void {
     const { transform, tankIdentity, collider } = tank;
     if (!transform || !collider) return;
 

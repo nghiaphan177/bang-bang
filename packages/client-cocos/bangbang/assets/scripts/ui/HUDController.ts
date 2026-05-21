@@ -29,6 +29,24 @@ export class HUDController extends Component {
   @property(Label)
   scoreLabel: Label | null = null;
 
+  @property(Label)
+  waitingLabel: Label | null = null;
+
+  setWaitingStatus(visible: boolean): void {
+    if (this.waitingLabel) {
+      this.waitingLabel.node.active = visible;
+    }
+  }
+
+  hideMatchInfo(): void {
+    if (this.matchTimerLabel) {
+      this.matchTimerLabel.node.active = false;
+    }
+    if (this.scoreLabel) {
+      this.scoreLabel.node.active = false;
+    }
+  }
+
   updateHP(hp: number, maxHp: number): void {
     const ratio = maxHp > 0 ? hp / maxHp : 0;
 
@@ -71,12 +89,14 @@ export class HUDController extends Component {
 
   updateMatchInfo(timerSec: number, redScore: number, blueScore: number): void {
     if (this.matchTimerLabel) {
+      this.matchTimerLabel.node.active = true;
       const mins = Math.floor(timerSec / 60);
       const secs = Math.floor(timerSec % 60);
       const secStr = secs < 10 ? `0${secs}` : `${secs}`;
       this.matchTimerLabel.string = `${mins}:${secStr}`;
     }
     if (this.scoreLabel) {
+      this.scoreLabel.node.active = true;
       this.scoreLabel.string = `${redScore} - ${blueScore}`;
     }
   }

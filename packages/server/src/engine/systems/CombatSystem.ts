@@ -15,6 +15,7 @@ import { EntityManager } from '../EntityManager';
 import { GameState } from '../GameState';
 import { type GameEntity, type CombatStatsComponent } from '../components';
 import { ProjectileSystem } from './ProjectileSystem';
+import { StatusEffectSystem } from './StatusEffectSystem';
 
 export class CombatSystem {
   public projectileSystem: ProjectileSystem | null = null;
@@ -78,6 +79,20 @@ export class CombatSystem {
       );
 
       target.health.hp = Math.max(0, target.health.hp - actualDamage);
+
+      // Apply status effects from projectile if any
+      const projEntity = entities.get(hit.projectileId as any);
+      if (projEntity?.projectile?.effects) {
+        for (const effect of projEntity.projectile.effects) {
+          StatusEffectSystem.applyEffect(
+            target,
+            effect.effectType as StatusEffectType,
+            effect.durationSec * 1000,
+            effect.magnitude ?? 0,
+            projEntity.projectile.ownerId
+          );
+        }
+      }
     }
   }
 

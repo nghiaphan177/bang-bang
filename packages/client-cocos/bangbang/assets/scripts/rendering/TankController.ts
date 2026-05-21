@@ -61,7 +61,7 @@ export class TankController extends Component {
     if (this.hpBarFill) {
       const fillWidth = 30 * ratio;
       this.hpBarFill.setScale(fillWidth, 1.1, 2.6);
-      this.hpBarFill.setPosition(-15 + fillWidth / 2, 0.05, 0);
+      this.hpBarFill.setPosition(-15 + fillWidth / 2, 0.2, 0);
     }
 
     // ── Hull Rotation (Y-axis, smooth lerp) ────────────────────
@@ -109,8 +109,8 @@ export class TankController extends Component {
     // HP Bar container
     this.hpBarNode = new Node('HPBar3D');
     this.node.addChild(this.hpBarNode);
-    // Position it float 24 units above center: Y=18, Z=-24
-    this.hpBarNode.setPosition(0, 18, -24);
+    // Position it float 22 units above center: Y=22, Z=-16
+    this.hpBarNode.setPosition(0, 22, -16);
 
     const boxMesh = utils.createMesh(primitives.box({ width: 1, height: 1, length: 1 }));
 
@@ -164,8 +164,8 @@ export class TankController extends Component {
       const mr = divider.addComponent(MeshRenderer);
       mr.mesh = boxMesh;
       mr.material = dividerMat;
-      divider.setScale(0.3, 1.2, 2.7);
-      divider.setPosition(x, 0.1, 0);
+      divider.setScale(0.4, 1.2, 2.8);
+      divider.setPosition(x, 0.4, 0);
       this.hpBarDividers.push(divider);
     }
   }

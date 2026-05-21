@@ -159,7 +159,7 @@ All remote tanks rendered as red. `TeamId` from snapshot is ignored.
 ### Work Stream 2: Server — Skill Execution
 
 #### Task 2.1 — Implement Skill E/Space Activation in Room.ts
-- **Status:** `[ ]`
+- **Status:** `[x]`
 - **Deps:** None
 - **Priority:** 🔴 P0
 - **Effort:** Medium (2-3 hours)
@@ -200,7 +200,7 @@ All remote tanks rendered as red. `TeamId` from snapshot is ignored.
 ---
 
 #### Task 2.2 — Implement DashSystem + Clone Decoy (Naruto Shadow Clone)
-- **Status:** `[ ]`
+- **Status:** `[x]`
 - **Deps:** Task 2.1
 - **Priority:** 🟠 P1
 - **Effort:** Medium-Large (3-4 hours)
@@ -263,7 +263,7 @@ There are 3 Dash-archetype skills with DIFFERENT behaviors:
 ---
 
 #### Task 2.3 — Implement HitscanSystem
-- **Status:** `[ ]`
+- **Status:** `[x]`
 - **Deps:** Task 2.1
 - **Priority:** 🟠 P1
 - **Effort:** Medium (2-3 hours)
@@ -314,7 +314,7 @@ castState?: {
 ---
 
 #### Task 2.4 — Implement Homing Projectile Logic
-- **Status:** `[ ]`
+- **Status:** `[x]`
 - **Deps:** Task 2.1
 - **Priority:** 🟠 P1
 - **Effort:** Medium (2 hours)
@@ -369,7 +369,7 @@ IronMan's Micro-Missiles (E) uses `ProjectileArchetype.Homing`.
 ---
 
 #### Task 2.5 — Implement Lob Projectile Logic
-- **Status:** `[ ]`
+- **Status:** `[x]`
 - **Deps:** Task 2.1
 - **Priority:** 🟠 P1
 - **Effort:** Medium (2 hours)
@@ -428,7 +428,7 @@ SpiderMan's Web Prison (Space) uses `ProjectileArchetype.Lob`.
 ### Work Stream 3: Client — Match State & Team Awareness
 
 #### Task 3.1 — Handle Match State from Snapshots
-- **Status:** `[ ]`
+- **Status:** `[x]`
 - **Deps:** Task 1.2
 - **Priority:** 🟡 P2
 - **Effort:** Small (1 hour)
