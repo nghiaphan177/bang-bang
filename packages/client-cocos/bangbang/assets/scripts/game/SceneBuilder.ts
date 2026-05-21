@@ -237,7 +237,8 @@ export class SceneBuilder {
     // Tank Selection Overlay
     const selectOverlayNode = new Node('TankSelectionOverlay');
     selectOverlayNode.layer = Layers.Enum.UI_2D;
-    selectOverlayNode.addComponent(UITransform);
+    const selectTrans = selectOverlayNode.addComponent(UITransform);
+    selectTrans.setContentSize(1280, 720);
     uiCanvasNode.addChild(selectOverlayNode);
     const tankSelectionController = selectOverlayNode.addComponent(TankSelectionController);
 

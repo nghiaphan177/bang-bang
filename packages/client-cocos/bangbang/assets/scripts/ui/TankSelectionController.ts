@@ -3,7 +3,7 @@
  */
 
 import {
-  _decorator, Component, Node, Graphics, Label, Color, UITransform, LabelOutline, Layers
+  _decorator, Component, Node, Graphics, Label, Color, UITransform, LabelOutline, Layers, BlockInputEvents
 } from 'cc';
 import { TankId } from '../shared/types/tank';
 import { TANK_ROSTER } from '../shared/data/tank-roster';
@@ -16,9 +16,25 @@ export class TankSelectionController extends Component {
   private cards: Map<TankId, { bgGraphics: Graphics, node: Node }> = new Map();
   private confirmCallback: ((id: TankId) => void) | null = null;
   private battleButtonGraphics: Graphics | null = null;
+  private bgGraphics: Graphics | null = null;
 
   public init(onConfirm: (id: TankId) => void): void {
     this.confirmCallback = onConfirm;
+
+    // Set content size for hit testing bounds on root node
+    const trans = this.node.getComponent(UITransform) ?? this.node.addComponent(UITransform);
+    trans.setContentSize(1280, 720);
+
+    // Create a dedicated background blocker child node.
+    // This node covers the screen and blocks inputs from reaching elements behind the overlay.
+    // Since cards and buttons are siblings added after this node, they will receive events first.
+    const bgBlockerNode = new Node('BgBlocker');
+    bgBlockerNode.layer = Layers.Enum.UI_2D;
+    const bgTrans = bgBlockerNode.addComponent(UITransform);
+    bgTrans.setContentSize(1280, 720);
+    bgBlockerNode.addComponent(BlockInputEvents);
+    this.node.addChild(bgBlockerNode);
+    this.bgGraphics = bgBlockerNode.addComponent(Graphics);
 
     // 1. Title Label
     const titleNode = new Node('TitleLabel');
@@ -133,7 +149,7 @@ export class TankSelectionController extends Component {
       passiveLabel.overflow = 3; // RESIZE_HEIGHT
 
       // Event listener for click/tap
-      cardNode.on(Node.EventType.TOUCH_END, () => {
+      cardNode.on(Node.EventType.TOUCH_START, () => {
         this.selectTank(id);
       });
 
@@ -168,7 +184,7 @@ export class TankSelectionController extends Component {
     btnOutline.color = new Color(0, 0, 0, 255);
     btnOutline.width = 2;
 
-    battleBtnNode.on(Node.EventType.TOUCH_END, () => {
+    battleBtnNode.on(Node.EventType.TOUCH_START, () => {
       if (this.confirmCallback) {
         this.confirmCallback(this.selectedId);
       }
@@ -184,11 +200,12 @@ export class TankSelectionController extends Component {
 
   private redraw(): void {
     // Background Overlay
-    const bgGraphics = this.getComponent(Graphics) ?? this.addComponent(Graphics);
-    bgGraphics.clear();
-    bgGraphics.fillColor = new Color(15, 17, 24, 245);
-    bgGraphics.rect(-640, -360, 1280, 720);
-    bgGraphics.fill();
+    if (this.bgGraphics) {
+      this.bgGraphics.clear();
+      this.bgGraphics.fillColor = new Color(15, 17, 24, 245);
+      this.bgGraphics.rect(-640, -360, 1280, 720);
+      this.bgGraphics.fill();
+    }
 
     // Roster Cards
     for (const [id, card] of this.cards) {
