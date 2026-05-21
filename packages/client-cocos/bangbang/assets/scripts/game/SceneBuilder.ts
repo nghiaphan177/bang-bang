@@ -1,6 +1,7 @@
 import {
   Node, Camera, MeshRenderer, primitives, utils, Color, Material,
   DirectionalLight, Texture2D, resources, Canvas, Label, ProgressBar, Graphics,
+  Layers, UITransform,
 } from 'cc';
 import { InputManager } from '../input/InputManager';
 import { MapController } from '../rendering/MapController';
@@ -41,7 +42,7 @@ export class SceneBuilder {
   private matCache: Map<string, Material> = new Map();
 
   public build(root: Node): SceneRefs {
-    // ── Camera ─────────────────────────────────────────────────
+    // ── Game Camera ──────────────────────────────────────────────
     const camNode = new Node('MainCamera');
     root.addChild(camNode);
     camNode.setPosition(640, 800, -480);
@@ -51,7 +52,7 @@ export class SceneBuilder {
     cam.orthoHeight = 360;
     cam.near = 1;
     cam.far = 2000;
-    cam.visibility = 0xffffffff;
+    cam.visibility = 0xffffffff & ~Layers.Enum.UI_2D;
 
     // ── Directional Light ──────────────────────────────────────
     const lightNode = new Node('DirLight');
@@ -112,51 +113,77 @@ export class SceneBuilder {
 
     // ── UI Canvas ──────────────────────────────────────────────
     const uiCanvasNode = new Node('UICanvas');
+    uiCanvasNode.layer = Layers.Enum.UI_2D;
     root.addChild(uiCanvasNode);
     const canvas = uiCanvasNode.addComponent(Canvas);
 
+    const uiCameraNode = new Node('UICamera');
+    uiCameraNode.layer = Layers.Enum.UI_2D;
+    uiCanvasNode.addChild(uiCameraNode);
+    const uiCamera = uiCameraNode.addComponent(Camera);
+    uiCamera.projection = 1; // ORTHO
+    uiCamera.priority = 1;
+    uiCamera.visibility = Layers.Enum.UI_2D;
+    uiCamera.clearFlags = 2; // DEPTH_ONLY
+    canvas.cameraComponent = uiCamera;
+
     // HUD
     const hudNode = new Node('HUD');
+    hudNode.layer = Layers.Enum.UI_2D;
+    hudNode.addComponent(UITransform);
     uiCanvasNode.addChild(hudNode);
     const hudController = hudNode.addComponent(HUDController);
     
     const hpBarNode = new Node('HPBar');
+    hpBarNode.layer = Layers.Enum.UI_2D;
     hudNode.addChild(hpBarNode);
+    hpBarNode.setPosition(-400, 300, 0);
     hudController.hpBar = hpBarNode.addComponent(ProgressBar);
     
     const hpLabelNode = new Node('HPLabel');
+    hpLabelNode.layer = Layers.Enum.UI_2D;
     hudNode.addChild(hpLabelNode);
+    hpLabelNode.setPosition(-400, 300, 0);
     hudController.hpLabel = hpLabelNode.addComponent(Label);
     
-    hudController.pingLabel = this.createLabelNode('PingLabel', hudNode);
-    hudController.modeLabel = this.createLabelNode('ModeLabel', hudNode);
-    hudController.playerCountLabel = this.createLabelNode('PlayerCountLabel', hudNode);
-    hudController.matchTimerLabel = this.createLabelNode('MatchTimerLabel', hudNode);
-    hudController.scoreLabel = this.createLabelNode('ScoreLabel', hudNode);
+    hudController.pingLabel = this.createLabelNode('PingLabel', hudNode, 400, 300);
+    hudController.modeLabel = this.createLabelNode('ModeLabel', hudNode, 400, 270);
+    hudController.playerCountLabel = this.createLabelNode('PlayerCountLabel', hudNode, 400, 240);
+    hudController.matchTimerLabel = this.createLabelNode('MatchTimerLabel', hudNode, 0, 300);
+    hudController.scoreLabel = this.createLabelNode('ScoreLabel', hudNode, 0, 270);
 
     // MatchOverlay
     const matchOverlayNode = new Node('MatchOverlay');
+    matchOverlayNode.layer = Layers.Enum.UI_2D;
+    matchOverlayNode.addComponent(UITransform);
     uiCanvasNode.addChild(matchOverlayNode);
     const matchOverlayController = matchOverlayNode.addComponent(MatchOverlayController);
     
-    matchOverlayController.countdownLabel = this.createLabelNode('CountdownLabel', matchOverlayNode);
+    matchOverlayController.countdownLabel = this.createLabelNode('CountdownLabel', matchOverlayNode, 0, 0);
     matchOverlayController.countdownLabel.fontSize = 72;
     matchOverlayController.countdownLabel.isBold = true;
     
     const resultsPanel = new Node('ResultsPanel');
+    resultsPanel.layer = Layers.Enum.UI_2D;
+    resultsPanel.addComponent(UITransform);
     matchOverlayNode.addChild(resultsPanel);
+    resultsPanel.setPosition(0, 0, 0);
     resultsPanel.active = false;
     matchOverlayController.resultsPanel = resultsPanel;
     
-    matchOverlayController.resultsTitleLabel = this.createLabelNode('ResultsTitleLabel', resultsPanel);
-    matchOverlayController.resultsDetailsLabel = this.createLabelNode('ResultsDetailsLabel', resultsPanel);
+    matchOverlayController.resultsTitleLabel = this.createLabelNode('ResultsTitleLabel', resultsPanel, 0, 50);
+    matchOverlayController.resultsDetailsLabel = this.createLabelNode('ResultsDetailsLabel', resultsPanel, 0, -50);
 
     // Minimap
     const minimapNode = new Node('MinimapContainer');
+    minimapNode.layer = Layers.Enum.UI_2D;
+    minimapNode.addComponent(UITransform);
     uiCanvasNode.addChild(minimapNode);
+    minimapNode.setPosition(450, -250, 0);
     const minimapController = minimapNode.addComponent(MinimapController);
     
     const minimapGraphicsNode = new Node('MinimapGraphics');
+    minimapGraphicsNode.layer = Layers.Enum.UI_2D;
     minimapNode.addChild(minimapGraphicsNode);
     minimapController.graphics = minimapGraphicsNode.addComponent(Graphics);
 
@@ -173,9 +200,11 @@ export class SceneBuilder {
     };
   }
 
-  private createLabelNode(name: string, parent: Node): Label {
+  private createLabelNode(name: string, parent: Node, x: number, y: number): Label {
     const node = new Node(name);
+    node.layer = Layers.Enum.UI_2D;
     parent.addChild(node);
+    node.setPosition(x, y, 0);
     return node.addComponent(Label);
   }
 
