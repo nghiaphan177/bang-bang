@@ -30,6 +30,7 @@ export interface RenderableTank {
   health: { hp: number; maxHp: number; isAlive: boolean };
   isPlayer?: boolean;
   isAlly?: boolean;
+  level?: number;
 }
 
 @ccclass('TankController')
@@ -50,6 +51,11 @@ export class TankController extends Component {
   private currentMaxHp = 0;
   private currentColorState: 'player' | 'ally' | 'enemy' | null = null;
 
+  private lastKnownHp = 0;
+  private redMat: Material | null = null;
+  private isFlashing = false;
+  private shimmerCount = 30;
+
   updateFromState(data: RenderableTank): void {
     const worldX = data.transform.position.x * TILE_PX;
     const worldZ = data.transform.position.y * TILE_PX;
@@ -65,16 +71,18 @@ export class TankController extends Component {
 
     this.initHPBar(isPlayer, isAlly, maxHp);
 
+    // ── Damage Flash ───────────────────────────────────────────
+    if (this.lastKnownHp > 0 && hp < this.lastKnownHp && data.health.isAlive) {
+      this.triggerDamageFlash();
+    }
+    this.lastKnownHp = hp;
+
     // ── Team Coloring ──────────────────────────────────────────
     const targetColorState = isPlayer ? 'player' : (isAlly ? 'ally' : 'enemy');
     if (this.currentColorState !== targetColorState) {
       this.currentColorState = targetColorState;
-      if (targetColorState === 'player') {
-        this.setTeamColor(COL_PLAYER_H, COL_PLAYER_T);
-      } else if (targetColorState === 'ally') {
-        this.setTeamColor(COL_ALLY_H, COL_ALLY_T);
-      } else {
-        this.setTeamColor(COL_ENEMY_H, COL_ENEMY_T);
+      if (!this.isFlashing) {
+        this.restoreMaterials();
       }
     }
 
@@ -104,17 +112,139 @@ export class TankController extends Component {
       this.turretPivot.setRotation(_tempQuat);
     }
 
+    // ── Visual Scale based on Level ────────────────────────────
+    const level = data.level ?? 1;
+    const HITBOX_SCALE = [1.0, 1.05, 1.10, 1.15, 1.20];
+    const scaleFactor = HITBOX_SCALE[level - 1] ?? 1.0;
+
     // ── Alive / Dead ───────────────────────────────────────────
     const alive = data.health.isAlive;
     if (!alive && this.lastAlive) {
-      this.node.setScale(0.01, 0.01, 0.01);
-    } else if (alive && !this.lastAlive) {
+      this.playDeathExplosion();
       tween(this.node)
-        .to(0.3, { scale: new Vec3(1, 1, 1) })
+        .to(0.3, { scale: new Vec3(0.01, 0.01, 0.01) })
+        .call(() => {
+          this.node.active = false;
+        })
         .start();
+    } else if (alive && !this.lastAlive) {
+      this.node.active = true;
+      this.node.setScale(0.01, 0.01, 0.01);
+      this.unschedule(this.toggleShimmer);
+      if (this.hullNode && this.turretPivot) {
+        this.hullNode.active = true;
+        this.turretPivot.active = true;
+      }
+      tween(this.node)
+        .to(0.4, { scale: new Vec3(scaleFactor, scaleFactor, scaleFactor) })
+        .start();
+
+      this.shimmerCount = 0;
+      this.schedule(this.toggleShimmer, 0.1, 30);
+    } else if (alive) {
+      if (this.shimmerCount >= 30) {
+        this.node.setScale(scaleFactor, scaleFactor, scaleFactor);
+        this.node.active = true;
+      }
+    } else {
+      this.node.active = false;
     }
-    this.node.active = alive;
     this.lastAlive = alive;
+  }
+
+  fireEffect(): void {
+    if (!this.turretPivot) return;
+
+    const flashNode = new Node('MuzzleFlash');
+    this.turretPivot.addChild(flashNode);
+    flashNode.setPosition(0, 0, -37);
+
+    const sphereMesh = utils.createMesh(primitives.sphere(2));
+    const mr = flashNode.addComponent(MeshRenderer);
+    mr.mesh = sphereMesh;
+    mr.material = this.makeMat(new Color(255, 200, 50, 255));
+
+    flashNode.setScale(0, 0, 0);
+    tween(flashNode)
+      .to(0.05, { scale: new Vec3(3, 3, 3) })
+      .to(0.05, { scale: new Vec3(0, 0, 0) })
+      .call(() => {
+        flashNode.destroy();
+      })
+      .start();
+  }
+
+  private triggerDamageFlash(): void {
+    if (!this.redMat) {
+      this.redMat = this.makeMat(new Color(255, 0, 0, 255));
+    }
+
+    if (this.hullNode) {
+      const hullMR = this.hullNode.getComponent(MeshRenderer);
+      if (hullMR) hullMR.material = this.redMat;
+      const slopeNode = this.hullNode.getChildByName('HullSlope');
+      if (slopeNode) {
+        const slopeMR = slopeNode.getComponent(MeshRenderer);
+        if (slopeMR) slopeMR.material = this.redMat;
+      }
+    }
+    if (this.turretPivot) {
+      const domeNode = this.turretPivot.getChildByName('TurretDome');
+      if (domeNode) {
+        const domeMR = domeNode.getComponent(MeshRenderer);
+        if (domeMR) domeMR.material = this.redMat;
+      }
+    }
+
+    this.isFlashing = true;
+    this.unschedule(this.restoreMaterials);
+    this.scheduleOnce(this.restoreMaterials, 0.1);
+  }
+
+  private restoreMaterials(): void {
+    this.isFlashing = false;
+    if (this.currentColorState === 'player') {
+      this.setTeamColor(COL_PLAYER_H, COL_PLAYER_T);
+    } else if (this.currentColorState === 'ally') {
+      this.setTeamColor(COL_ALLY_H, COL_ALLY_T);
+    } else {
+      this.setTeamColor(COL_ENEMY_H, COL_ENEMY_T);
+    }
+  }
+
+  private toggleShimmer(): void {
+    this.shimmerCount++;
+    if (this.hullNode && this.turretPivot) {
+      const activeState = !this.hullNode.active;
+      this.hullNode.active = activeState;
+      this.turretPivot.active = activeState;
+
+      if (this.shimmerCount >= 30) {
+        this.hullNode.active = true;
+        this.turretPivot.active = true;
+        this.unschedule(this.toggleShimmer);
+      }
+    }
+  }
+
+  private playDeathExplosion(): void {
+    if (!this.node.parent) return;
+    const expNode = new Node('DeathExplosion');
+    this.node.parent.addChild(expNode);
+    expNode.setPosition(this.node.position);
+
+    const sphereMesh = utils.createMesh(primitives.sphere(8));
+    const mr = expNode.addComponent(MeshRenderer);
+    mr.mesh = sphereMesh;
+    mr.material = this.makeMat(new Color(255, 80, 0, 255));
+
+    expNode.setScale(0, 0, 0);
+    tween(expNode)
+      .to(0.3, { scale: new Vec3(3, 3, 3) })
+      .call(() => {
+        expNode.destroy();
+      })
+      .start();
   }
 
   private initHPBar(isPlayer: boolean, isAlly: boolean, maxHp: number): void {

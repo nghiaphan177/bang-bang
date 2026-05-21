@@ -18,10 +18,14 @@ import { ProjectileController, type RenderableProjectile } from '../rendering/Pr
 import { HUDController } from '../ui/HUDController';
 import { MatchOverlayController } from '../ui/MatchOverlayController';
 import { MinimapController } from '../ui/MinimapController';
-import type { GameSnapshot, PlayerInput } from '../shared/types/network';
+import { KillFeedController } from '../ui/KillFeedController';
+import type { GameSnapshot, PlayerInput, GameEvent } from '../shared/types/network';
+import { GameEventType } from '../shared/types/network';
 import type { Radians } from '../shared/types/core';
 import { MatchPhase } from '../shared/types/state-machine';
 import { SceneBuilder, TILE_PX } from './SceneBuilder';
+import { TankId } from '../shared/types/tank';
+import { TANK_ROSTER } from '../shared/data/tank-roster';
 
 const { ccclass } = _decorator;
 
@@ -39,6 +43,7 @@ export class GameManager extends Component {
   private hudController: HUDController | null = null;
   private matchOverlay: MatchOverlayController | null = null;
   private minimapController: MinimapController | null = null;
+  private killFeedController: KillFeedController | null = null;
 
   private mode: 'connecting' | 'online' | 'local' = 'connecting';
   private networkClient: NetworkClient | null = null;
@@ -52,6 +57,12 @@ export class GameManager extends Component {
   private latestSnapshot: GameSnapshot | null = null;
 
   private sceneBuilder: SceneBuilder = new SceneBuilder();
+
+  private selectedTankId: TankId = TankId.IronMan; // dynamic lobby select in Task 7.1
+  private skillECooldownMs = 0;
+  private skillEMaxCooldownMs = 9000;
+  private skillSpaceCooldownMs = 0;
+  private skillSpaceMaxCooldownMs = 42000;
 
   // ─── Lifecycle ──────────────────────────────────────────────────
 
@@ -67,6 +78,13 @@ export class GameManager extends Component {
     this.hudController = refs.hudController;
     this.matchOverlay = refs.matchOverlayController;
     this.minimapController = refs.minimapController;
+    this.killFeedController = refs.killFeedController;
+
+    const tankDef = TANK_ROSTER[this.selectedTankId];
+    if (tankDef) {
+      this.skillEMaxCooldownMs = tankDef.skillE.cooldownSec * 1000;
+      this.skillSpaceMaxCooldownMs = tankDef.skillSpace.cooldownSec * 1000;
+    }
 
     const serverAvailable = await NetworkClient.isServerAvailable(SERVER_INFO_URL);
     if (serverAvailable) {
@@ -90,11 +108,12 @@ export class GameManager extends Component {
     this.networkClient = new NetworkClient({
       url: SERVER_URL,
       playerId: this.playerId as any,
-      tankId: 'IronMan' as any,
+      tankId: this.selectedTankId as any,
       playerName: 'CocosPlayer',
     });
 
     this.networkClient.onSnapshot((s) => this.onSnapshot(s));
+    this.networkClient.onGameEvent((e) => this.onGameEvent(e));
     this.networkClient.onConnect(() => console.log('[Game] Connected'));
     this.networkClient.onDisconnect(() => console.log('[Game] Disconnected'));
     this.networkClient.connect();
@@ -131,7 +150,32 @@ export class GameManager extends Component {
       seq: this.networkClient?.getNextSeq() ?? 0,
     };
 
-    this.prediction.applyInput(playerInput, dt * 1000);
+    // Cooldown ticks
+    const dtMs = dt * 1000;
+    this.skillECooldownMs = Math.max(0, this.skillECooldownMs - dtMs);
+    this.skillSpaceCooldownMs = Math.max(0, this.skillSpaceCooldownMs - dtMs);
+
+    // Predict cooldown trigger
+    let isAlive = true;
+    if (this.latestSnapshot) {
+      const me = this.latestSnapshot.tanks.find(
+        (t) => (t.playerId as string) === this.playerId,
+      );
+      if (me) {
+        isAlive = me.isAlive;
+      }
+    }
+
+    if (isAlive && !isMatchEnd) {
+      if (playerInput.skillE && this.skillECooldownMs <= 0) {
+        this.skillECooldownMs = this.skillEMaxCooldownMs;
+      }
+      if (playerInput.skillSpace && this.skillSpaceCooldownMs <= 0) {
+        this.skillSpaceCooldownMs = this.skillSpaceMaxCooldownMs;
+      }
+    }
+
+    this.prediction.applyInput(playerInput, dtMs);
 
     if (this.mode === 'online' && this.networkClient) {
       this.networkClient.sendInput({
@@ -162,6 +206,7 @@ export class GameManager extends Component {
         );
         if (me) {
           rd.health = { hp: me.hp, maxHp: me.maxHp, isAlive: me.isAlive };
+          rd.level = me.level;
         }
       }
       this.playerTankController.updateFromState(rd);
@@ -174,6 +219,13 @@ export class GameManager extends Component {
           this.mode,
           this.latestSnapshot?.tanks.length ?? 0
         );
+
+        // Update Skill Cooldowns on HUD
+        const ratioE = this.skillEMaxCooldownMs > 0 ? this.skillECooldownMs / this.skillEMaxCooldownMs : 0;
+        const ratioSpace = this.skillSpaceMaxCooldownMs > 0 ? this.skillSpaceCooldownMs / this.skillSpaceMaxCooldownMs : 0;
+        const secE = this.skillECooldownMs / 1000;
+        const secSpace = this.skillSpaceCooldownMs / 1000;
+        this.hudController.updateSkillCooldowns(ratioE, ratioSpace, secE, secSpace);
       }
     }
 
@@ -237,6 +289,14 @@ export class GameManager extends Component {
     this.renderProjectiles(snapshot);
   }
 
+  private onGameEvent(event: GameEvent): void {
+    if (event.eventType === GameEventType.Kill) {
+      const killerName = (event.data.killerName as string) || 'Unknown';
+      const victimName = (event.data.victimName as string) || 'Unknown';
+      this.killFeedController?.addKillEntry(killerName, victimName);
+    }
+  }
+
   private renderRemotes(entities: InterpolatedEntity[]): void {
     const active = new Set<string>();
     const myTeam = this.latestSnapshot?.tanks.find(
@@ -263,6 +323,7 @@ export class GameManager extends Component {
         health: { hp: e.hp, maxHp: e.maxHp, isAlive: e.isAlive },
         isPlayer: false,
         isAlly,
+        level: e.level,
       });
     }
 

@@ -27,6 +27,7 @@ export interface InterpolatedEntity {
   isAlive: boolean;
   tankId: string;
   team: string;
+  level: number;
 }
 
 export class EntityInterpolation {
@@ -120,6 +121,7 @@ export class EntityInterpolation {
         isAlive: nextTank.isAlive,
         tankId: nextTank.tankId as string,
         team: nextTank.team as string,
+        level: nextTank.level,
       });
     }
 
@@ -145,6 +147,7 @@ export class EntityInterpolation {
       isAlive: tank.isAlive,
       tankId: tank.tankId as string,
       team: tank.team as string,
+      level: tank.level,
     };
   }
 

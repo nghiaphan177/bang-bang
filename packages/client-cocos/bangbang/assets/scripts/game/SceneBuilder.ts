@@ -1,7 +1,7 @@
 import {
   Node, Camera, MeshRenderer, primitives, utils, Color, Material,
-  DirectionalLight, Texture2D, resources, Canvas, Label, ProgressBar, Graphics,
-  Layers, UITransform,
+  DirectionalLight, Texture2D, resources, Canvas, Label, Graphics,
+  Layers, UITransform, LabelOutline,
 } from 'cc';
 import { InputManager } from '../input/InputManager';
 import { MapController } from '../rendering/MapController';
@@ -10,6 +10,7 @@ import { TankController } from '../rendering/TankController';
 import { HUDController } from '../ui/HUDController';
 import { MatchOverlayController } from '../ui/MatchOverlayController';
 import { MinimapController } from '../ui/MinimapController';
+import { KillFeedController } from '../ui/KillFeedController';
 import { ARCTIC_COLLISION } from '../shared/data/arctic-collision';
 import { loadCollisionMap } from '../shared/data/collision-map-loader';
 import { TileType } from '../shared/types/environment';
@@ -36,6 +37,7 @@ export interface SceneRefs {
   hudController: HUDController;
   matchOverlayController: MatchOverlayController;
   minimapController: MinimapController;
+  killFeedController: KillFeedController;
 }
 
 export class SceneBuilder {
@@ -161,6 +163,31 @@ export class SceneBuilder {
     hudController.waitingLabel.fontSize = 24;
     hudController.waitingLabel.node.active = false;
 
+    // Skill Cooldowns
+    const skillE = this.createSkillSlot(
+      'SkillE',
+      hudNode,
+      -70,
+      -280,
+      60,
+      60,
+      'E'
+    );
+    hudController.skillEGraphics = skillE.graphics;
+    hudController.skillELabel = skillE.label;
+
+    const skillSpace = this.createSkillSlot(
+      'SkillSpace',
+      hudNode,
+      70,
+      -280,
+      80,
+      60,
+      'SPACE'
+    );
+    hudController.skillSpaceGraphics = skillSpace.graphics;
+    hudController.skillSpaceLabel = skillSpace.label;
+
     // MatchOverlay
     const matchOverlayNode = new Node('MatchOverlay');
     matchOverlayNode.layer = Layers.Enum.UI_2D;
@@ -197,6 +224,14 @@ export class SceneBuilder {
     minimapNode.addChild(minimapGraphicsNode);
     minimapController.graphics = minimapGraphicsNode.addComponent(Graphics);
 
+    // Kill Feed
+    const killFeedNode = new Node('KillFeed');
+    killFeedNode.layer = Layers.Enum.UI_2D;
+    killFeedNode.addComponent(UITransform);
+    uiCanvasNode.addChild(killFeedNode);
+    killFeedNode.setPosition(400, 190, 0);
+    const killFeedController = killFeedNode.addComponent(KillFeedController);
+
     return {
       gameCamera: cam,
       inputManager,
@@ -207,6 +242,7 @@ export class SceneBuilder {
       hudController,
       matchOverlayController,
       minimapController,
+      killFeedController,
     };
   }
 
@@ -364,5 +400,47 @@ export class SceneBuilder {
     mat.setProperty('mainColor', color);
     this.matCache.set(name, mat);
     return mat;
+  }
+
+  private createSkillSlot(
+    name: string,
+    parent: Node,
+    x: number,
+    y: number,
+    width: number,
+    height: number,
+    defaultText: string
+  ): { graphics: Graphics, label: Label } {
+    const slotNode = new Node(name);
+    slotNode.layer = Layers.Enum.UI_2D;
+    const slotTrans = slotNode.addComponent(UITransform);
+    slotTrans.setContentSize(width, height);
+    slotNode.setPosition(x, y, 0);
+    parent.addChild(slotNode);
+
+    const graphicsNode = new Node(`${name}Graphics`);
+    graphicsNode.layer = Layers.Enum.UI_2D;
+    const graphicsTrans = graphicsNode.addComponent(UITransform);
+    graphicsTrans.setContentSize(width, height);
+    slotNode.addChild(graphicsNode);
+    const graphics = graphicsNode.addComponent(Graphics);
+
+    const labelNode = new Node(`${name}Label`);
+    labelNode.layer = Layers.Enum.UI_2D;
+    const labelTrans = labelNode.addComponent(UITransform);
+    labelTrans.setContentSize(width, height);
+    slotNode.addChild(labelNode);
+    labelNode.setPosition(0, 0, 0);
+
+    const label = labelNode.addComponent(Label);
+    label.string = defaultText;
+    label.fontSize = 16;
+    label.color = new Color(255, 255, 255, 255);
+
+    const outline = labelNode.addComponent(LabelOutline);
+    outline.color = new Color(0, 0, 0, 255);
+    outline.width = 2;
+
+    return { graphics, label };
   }
 }
